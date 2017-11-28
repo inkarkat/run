@@ -66,7 +66,7 @@ prompt()
     printf "%s%-$((${COLUMNS:-80} - ${#timestamp} - 10))s %s !%-6s%s\n$ %s\n" "$exitColor" "$exitStatusIndicator" "$timestamp" "${1:-}" "$COLOR_RESET" "$command"
 }
 
-let count=1
+count=
 exitStatusIndicator=
 exitColor=$COLOR_RUNWITHPROMPT_SUCCESS
 overallExitStatus=0

@@ -2,7 +2,7 @@
 
 printShortUsage()
 {
-    printf 'Usage: echo COMMANDS | %q %s\n' "$(basename "$1")" '[--trailing-prompt] [--worst-status] [-?|-h|--help]'
+    printf 'Usage: echo COMMANDS | %q %s\n' "$(basename "$1")" '[--trailing-prompt] [--worst-status] [-c|--comment COMMENT] [-?|-h|--help]'
     printf 'Usage: %q %s <<EOF\n  COMMANDS\nEOF\n' "$(basename "$1")" '[...]'
 }
 printUsage()
@@ -27,6 +27,9 @@ HELPDESCRIPTION
 			COMMAND.
     --worst-status	Return the highest exit status of all COMMANDS instead
 			of the exit status of the last COMMAND.
+    --comment|-c COMMENT
+			Use / replace \! in \$PS1 with COMMENT instead of the
+			default counter of executed COMMANDS.
 HELPTEXT
 }
 
@@ -38,6 +41,7 @@ do
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--trailing-prompt)	shift; isTrailingPrompt=t;;
 	--worst-status)		shift; isWorstStatus=t;;
+	--comment|-c)		shift; comment="$1"; shift;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printShortUsage "$0"; } >&2; exit 2;;
 	*)		break;;
@@ -47,8 +51,8 @@ done
 
 
 : ${COLOR_RESET:='[0m'}
-: ${COLOR_RUNWITHPROMPT_SUCCESS:='[47m'}
-: ${COLOR_RUNWITHPROMPT_FAILURE:='[01;37;41m'}
+: ${COLOR_RUNWITHPROMPT_SUCCESS:='[00;35;47m'}
+: ${COLOR_RUNWITHPROMPT_FAILURE:='[00;37;41m'}
 : ${RUNWITHPROMPT_TIMESTAMP:=%d-%b-%Y %T}
 
 
@@ -59,15 +63,16 @@ timestamp()
 prompt()
 {
     timestamp=$(timestamp)
-    printf "%s%-$((${COLUMNS:-80} - ${#timestamp} - 2))s %s %s\n$ %s\n" "$exitColor" "$exitStatusIndicator" "$timestamp" "$COLOR_RESET" "$command"
+    printf "%s%-$((${COLUMNS:-80} - ${#timestamp} - 10))s %s !%-6s%s\n$ %s\n" "$exitColor" "$exitStatusIndicator" "$timestamp" "${1:-}" "$COLOR_RESET" "$command"
 }
 
+let count=1
 exitStatusIndicator=
 exitColor=$COLOR_RUNWITHPROMPT_SUCCESS
 overallExitStatus=0
 while IFS=$'\n' read -r command
 do
-    prompt
+    prompt "${comment-$count}"
 
     eval "$command"
     exitStatus=$?
@@ -81,7 +86,9 @@ do
     if [ ! "$isWorstStatus" -o $exitStatus -gt $overallExitStatus ]; then
 	overallExitStatus=$exitStatus
     fi
+
+    let count+=1
 done
-[ "$isTrailingPrompt" ] && prompt
+[ "$isTrailingPrompt" ] && prompt "${comment-$count}"
 
 exit $overallExitStatus

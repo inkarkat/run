@@ -1,0 +1,87 @@
+#!/bin/bash
+
+printShortUsage()
+{
+    printf 'Usage: echo COMMANDS | %q %s\n' "$(basename "$1")" '[--trailing-prompt] [--worst-status] [-?|-h|--help]'
+    printf 'Usage: %q %s <<EOF\n  COMMANDS\nEOF\n' "$(basename "$1")" '[...]'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 'Try %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Run the COMMANDS read from stdin, each surrounded by an (emulated) command prompt.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    cat <<HELPTEXT
+    --trailing-prompt	Include a final prompt after the last COMMAND, too.
+			Useful to visualize the exit status of the last read
+			COMMAND.
+    --worst-status	Return the highest exit status of all COMMANDS instead
+			of the exit status of the last COMMAND.
+HELPTEXT
+}
+
+isTrailingPrompt=
+isWorstStatus=
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--trailing-prompt)	shift; isTrailingPrompt=t;;
+	--worst-status)		shift; isWorstStatus=t;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printShortUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+[ $# -gt 0 ] && { printUsage "$0"; exit 2; }
+
+
+: ${COLOR_RESET:='[0m'}
+: ${COLOR_RUNWITHPROMPT_SUCCESS:='[47m'}
+: ${COLOR_RUNWITHPROMPT_FAILURE:='[01;37;41m'}
+: ${RUNWITHPROMPT_TIMESTAMP:=%d-%b-%Y %T}
+
+
+timestamp()
+{
+    [ "$RUNWITHPROMPT_TIMESTAMP" ] && date "+$RUNWITHPROMPT_TIMESTAMP"
+}
+prompt()
+{
+    timestamp=$(timestamp)
+    printf "%s%-$((${COLUMNS:-80} - ${#timestamp} - 2))s %s %s\n$ %s\n" "$exitColor" "$exitStatusIndicator" "$timestamp" "$COLOR_RESET" "$command"
+}
+
+exitStatusIndicator=
+exitColor=$COLOR_RUNWITHPROMPT_SUCCESS
+overallExitStatus=0
+while IFS=$'\n' read -r command
+do
+    prompt
+
+    eval "$command"
+    exitStatus=$?
+
+    if [ $exitStatus -eq 0 ]; then
+	exitStatusIndicator=; exitColor=$COLOR_RUNWITHPROMPT_SUCCESS
+    else
+	exitStatusIndicator="(${exitStatus})"; exitColor=$COLOR_RUNWITHPROMPT_FAILURE
+    fi
+
+    if [ ! "$isWorstStatus" -o $exitStatus -gt $overallExitStatus ]; then
+	overallExitStatus=$exitStatus
+    fi
+done
+[ "$isTrailingPrompt" ] && prompt
+
+exit $overallExitStatus

@@ -1,0 +1,30 @@
+#!/bin/bash
+
+printUsage()
+{
+    cat <<HELPTEXT
+Invoke each COMMAND sequentially, passing ARGUMENT [...] to each. Overall exit
+status is the highest status of all.
+HELPTEXT
+printf 'Usage: %q %s\n' "$(basename "$1")" 'COMMAND, ... [-- [ARGUMENT [...]] [-?|-h|--help]'
+}
+
+typeset -a commands=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--)		shift; break;;
+	*)		commands+=("$1")
+			shift
+			;;
+    esac
+done
+[ ${#commands[@]} -eq 0 ] && { printUsage "$0"; exit 2; }
+
+status=0
+for c in "${commands[@]}"
+do
+    "$c" "$@" || status=$?
+done
+exit $status

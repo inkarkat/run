@@ -5,15 +5,19 @@ printUsage()
     cat <<HELPTEXT
 Invoke each COMMAND sequentially, passing ARGUMENT [...] to each. Overall exit
 status is the highest status of all.
+Can print a header with COMMAND / a full emulated prompt before each COMMAND.
 HELPTEXT
-printf 'Usage: %q %s\n' "$(basename "$1")" 'COMMAND, ... [-- [ARGUMENT [...]] [-?|-h|--help]'
+printf 'Usage: %q %s\n' "$(basename "$1")" '[--with-header|--with-prompt] COMMAND, ... [-- [ARGUMENT [...]] [-?|-h|--help]'
 }
 
+typeset with=
 typeset -a commands=()
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--with-header)	shift; with=header;;
+	--with-prompt)	shift; with=prompt;;
 	--)		shift; break;;
 	*)		commands+=("$1")
 			shift
@@ -22,9 +26,21 @@ do
 done
 [ ${#commands[@]} -eq 0 ] && { printUsage "$0"; exit 2; }
 
-status=0
-for c in "${commands[@]}"
-do
-    "$c" "$@" || status=$?
-done
-exit $status
+case "$with" in
+    prompt)
+	for c in "${commands[@]}"
+	do
+	    printf '%q ' "$c" "$@"
+	    printf '\n'
+	done | runWithPrompt --worst-status
+	;;
+    *)
+	status=0
+	for c in "${commands[@]}"
+	do
+	    [ "$with" = 'header' ] && printf '[01m%s:[0m\n' "$c"
+	    "$c" "$@" || status=$?
+	done
+	exit $status
+	;;
+esac

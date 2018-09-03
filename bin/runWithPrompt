@@ -110,6 +110,17 @@ else
     }
 fi
 
+originalColumns=${COLUMNS:-80}
+adaptColumnsToFitLongComment()
+{
+    [ "$COMMENT" ] || return
+    local commentLen=${#COMMENT}
+    if [ $commentLen -gt 6 ]; then
+	local newColumns=$((originalColumns - commentLen + 6))
+	[ $newColumns -gt 25 -a $newColumns -lt $COLUMNS ] && COLUMNS=$newColumns
+    fi
+}
+
 count=
 exitStatus=0
 overallExitStatus=0
@@ -124,7 +135,7 @@ do
 	continue
     fi
 
-    prompt "${COMMENT-$count}"
+    adaptColumnsToFitLongComment; prompt "${COMMENT-$count}"
 
     eval "$command"
     exitStatus=$?
@@ -135,6 +146,6 @@ do
 
     let count+=1
 done
-[ "$isTrailingPrompt" ] && prompt "${COMMENT-$count}"
+[ "$isTrailingPrompt" ] && { adaptColumnsToFitLongComment; prompt "${COMMENT-$count}"; }
 
 exit $overallExitStatus

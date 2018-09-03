@@ -57,7 +57,7 @@ do
 	*)		break;;
     esac
 done
-[ $# -gt 0 ] && { printUsage "$0"; exit 2; }
+[ $# -gt 0 ] && { printUsage "$0" >&2; exit 2; }
 
 if [ ! "$isEmulatePrompt" -a ! "$PS1" ]; then
     # The prompt isn't exported.

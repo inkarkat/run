@@ -2,7 +2,7 @@
 
 printShortUsage()
 {
-    printf 'Usage: echo COMMANDS | %q %s\n' "$(basename "$1")" '[--trailing-prompt|--no-trailing-prompt] [--emulate-prompt] [--worst-status] [-c|--comment COMMENT] [-?|-h|--help]'
+    printf 'Usage: echo COMMANDS | %q %s\n' "$(basename "$1")" '[--trailing-prompt|--no-trailing-prompt] [--emulate-prompt] [--worst-status] [-c|--comment COMMENT] [--summarize-failed ERROR-TEXT [--summarize-failed-separator SEP]] [-?|-h|--help]'
     printf 'Usage: %q %s <<EOF\n  COMMANDS\nEOF\n' "$(basename "$1")" '[...]'
 }
 printUsage()
@@ -42,12 +42,23 @@ HELPDESCRIPTION
 			with the form COMMENT='text' or COMMENT="text" or
 			COMMENT=text, the update will happen silently; i.e.
 			without printing that command-line.
+    --summarize-failed ERROR-TEXT
+			For each failed line in COMMANDS, record the counter /
+			COMMENT and summarize those failures at the end (as a
+			commented command in the trailing prompt, or just as a
+			final line if --no-trailing-prompt) with
+			ERROR-TEXT COMMENT1 COMMENT2 ...
+    --summarize-failed-separator SEP
+			Use SEP instead of a space in between COMMENT1 COMMENT2.
 HELPTEXT
 }
 
 isTrailingPrompt=t
 isEmulatePrompt=t; [ "${BASH_VERSINFO:-}" ] && [ \( ${BASH_VERSINFO[0]} -eq 4 -a ${BASH_VERSINFO[1]} -ge 4 \) -o ${BASH_VERSINFO[0]} -gt 4 ] && isEmulatePrompt=
 isWorstStatus=
+isSummarizeFailed=
+summarizeFailedSeparator=' '
+summarizeFailedPrefix=
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -57,6 +68,8 @@ do
 	--emulate-prompt)	shift; isEmulatePrompt=t;;
 	--worst-status)		shift; isWorstStatus=t;;
 	--comment|-c)		shift; COMMENT="$1"; shift;;
+	--summarize-failed)	shift; isSummarizeFailed=t; summarizeFailedPrefix="$1"; shift;;
+	--summarize-failed-separator)	shift; summarizeFailedSeparator="$1"; shift;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printShortUsage "$0"; } >&2; exit 2;;
 	*)		break;;
@@ -124,6 +137,7 @@ adaptColumnsToFitLongComment()
 count=
 exitStatus=0
 overallExitStatus=0
+summarizeFailures=
 while IFS=$'\n' read -r command
 do
     if  [[ "$command" =~ ^[[:space:]]*COMMENT=\"[^\"]*\"[[:space:]]*$ ]] || \
@@ -140,12 +154,20 @@ do
     eval "$command"
     exitStatus=$?
 
+    [ $exitStatus -eq 0 ] || summarizeFailures="${summarizeFailures}${summarizeFailures:+$summarizeFailedSeparator}${COMMENT-$count}"
     if [ ! "$isWorstStatus" -o $exitStatus -gt $overallExitStatus ]; then
 	overallExitStatus=$exitStatus
     fi
 
     let count+=1
 done
-[ "$isTrailingPrompt" ] && { adaptColumnsToFitLongComment; prompt "${COMMENT-$count}"; }
+if [ "$isTrailingPrompt" ]; then
+    [ "$isSummarizeFailed" ] && command="# ${summarizeFailedPrefix}$summarizeFailures"
+
+    adaptColumnsToFitLongComment
+    prompt "${COMMENT-$count}"
+else
+    [ "$isSummarizeFailed" ] && printf >&2 '%s%s\n' "$summarizeFailedPrefix" "$summarizeFailures"
+fi
 
 exit $overallExitStatus

@@ -123,7 +123,7 @@ else
     }
 fi
 
-originalColumns=${COLUMNS:-80}
+originalColumns=${COLUMNS:=80}
 adaptColumnsToFitLongComment()
 {
     [ "$COMMENT" ] || return
@@ -162,12 +162,12 @@ do
     let count+=1
 done
 if [ "$isTrailingPrompt" ]; then
-    [ "$isSummarizeFailed" ] && command="# ${summarizeFailedPrefix}$summarizeFailures"
+    [ "$summarizeFailures" ] && command="# ${summarizeFailedPrefix}$summarizeFailures"
 
     adaptColumnsToFitLongComment
     prompt "${COMMENT-$count}"
 else
-    [ "$isSummarizeFailed" ] && printf >&2 '%s%s\n' "$summarizeFailedPrefix" "$summarizeFailures"
+    [ "$summarizeFailures" ] && printf >&2 '%s%s\n' "$summarizeFailedPrefix" "$summarizeFailures"
 fi
 
 exit $overallExitStatus

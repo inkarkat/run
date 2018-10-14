@@ -112,14 +112,14 @@ if [ "$isEmulatePrompt" ]; then
 	fi
 
 	timestamp=$(timestamp)
-	printf "%s%-$((${COLUMNS:-80} - ${#timestamp} - 10))s %s %s %s\n$ %s\n" "$exitColor" "$exitStatusIndicator" "$timestamp" "${1:+!}${1:-  }" "$COLOR_RESET" "$command"
+	printf "%s%-$((${COLUMNS:-80} - ${#timestamp} - 10))s %s %s %s\n$ %s\n" "$exitColor" "$exitStatusIndicator" "$timestamp" "${1:+!}${1:-  }" "$COLOR_RESET" "$2"
     }
 else
     prompt()
     {
 	local promptString="${PS1//\\!/${1:- }}"
 	[ $exitStatus -eq 0 ]
-	printf '%s%s\n' "${promptString@P}" "$command"
+	printf '%s%s\n' "${promptString@P}" "$2"
     }
 fi
 
@@ -157,7 +157,7 @@ do
 	continue
     fi
 
-    adaptColumnsToFitLongComment; prompt "${COMMENT-$count}"
+    adaptColumnsToFitLongComment; prompt "${COMMENT-$count}" "$command"
 
     eval "$command"
     exitStatus=$?
@@ -173,7 +173,7 @@ if [ "$isTrailingPrompt" ]; then
     [ "$summarizeFailures" ] && command="# ${summarizeFailedPrefix}$summarizeFailures"
 
     adaptColumnsToFitLongComment
-    prompt "${COMMENT-$count}"
+    prompt "${COMMENT-$count}" "$command"
 else
     [ "$summarizeFailures" ] && printf >&2 '%s%s\n' "$summarizeFailedPrefix" "$summarizeFailures"
 fi

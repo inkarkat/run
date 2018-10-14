@@ -138,7 +138,15 @@ count=
 exitStatus=0
 overallExitStatus=0
 summarizeFailures=
-while IFS=$'\n' read -r command
+
+# Prevent that read command(s) consume following commands by reading from stdin.
+# Instead, redirect stdin directly from the terminal (if available), or the null
+# device. Note: For some commands, you can also directly influence their
+# behavior; e.g. ssh -n.
+exec 3<&0
+exec 0</dev/tty || exec 0</dev/null
+
+while IFS=$'\n' <&3 read -r command
 do
     if  [[ "$command" =~ ^[[:space:]]*COMMENT=\"[^\"]*\"[[:space:]]*$ ]] || \
 	[[ "$command" =~ ^[[:space:]]*COMMENT=\'[^\']*\'[[:space:]]*$ ]] || \

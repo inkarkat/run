@@ -18,6 +18,11 @@ printLongUsage()
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
 Run the COMMANDS read from stdin, each surrounded by an (emulated) command prompt.
+You can modify the logged COMMAND (basically defining a shorter or nicer alias
+for what is actually executed) by setting the COMMAND=... variable. If you do
+this on a separate line with the form COMMAND='text' or COMMAND="text" or
+COMMAND=text, the update will happen silently; i.e. without printing that
+command-line.
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
@@ -148,16 +153,16 @@ exec 0</dev/tty || exec 0</dev/null
 
 while IFS=$'\n' <&3 read -r command
 do
-    if  [[ "$command" =~ ^[[:space:]]*COMMENT=\"[^\"]*\"[[:space:]]*$ ]] || \
-	[[ "$command" =~ ^[[:space:]]*COMMENT=\'[^\']*\'[[:space:]]*$ ]] || \
-	[[ "$command" =~ ^[[:space:]]*COMMENT=[^\'\"\;\&\|]*[[:space:]]*$ ]]; then
-	# This command solely sets the COMMENT; don't log it, just silently
-	# execute it.
+    if  [[ "$command" =~ ^[[:space:]]*(COMMENT|COMMAND)=\"[^\"]*\"[[:space:]]*$ ]] || \
+	[[ "$command" =~ ^[[:space:]]*(COMMENT|COMMAND)=\'[^\']*\'[[:space:]]*$ ]] || \
+	[[ "$command" =~ ^[[:space:]]*(COMMENT|COMMAND)=[^\'\"\;\&\|]*[[:space:]]*$ ]]; then
+	# This command solely sets the COMMENT or COMMAND; don't log it, just
+	# silently execute it.
 	eval "$command"
 	continue
     fi
 
-    adaptColumnsToFitLongComment; prompt "${COMMENT-$count}" "$command"
+    adaptColumnsToFitLongComment; prompt "${COMMENT-$count}" "${COMMAND-$command}"
 
     eval "$command"
     exitStatus=$?

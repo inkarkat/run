@@ -7,39 +7,44 @@ Invoke each COMMAND sequentially, passing ARGUMENT [...] to each. Overall exit
 status is the highest status of all.
 Can print a header with COMMAND / a full emulated prompt before each COMMAND.
 HELPTEXT
-printf 'Usage: %q %s\n' "$(basename "$1")" '[--with-header|--with-prompt] SIMPLECOMMAND [...] [-- [ARGUMENT [...]] [-?|-h|--help]'
-printf 'Usage: %q %s\n' "$(basename "$1")" '[...] -c|--command "COMMANDLINE" [-c ...] [--] [ARGUMENT [...]] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[--with-header|--with-prompt] -c|--command "COMMANDLINE" | SIMPLECOMMAND [...] [-- [ARGUMENT [...]] [-?|-h|--help]'
 }
 
-typeset with=
+# In order to maintain the order of commands, we need to investigate beforehand
+# whether eval is needed.
 isNeedEval=
+for arg
+do
+    case "$arg" in
+	--command|-c)	isNeedEval=t;;
+	--)		break;;
+    esac
+done
+
+typeset with=
 typeset -a commands=()
 typeset -a simpleCommands=()
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
-	--command|-c)	shift; commands+=(${commands:+;} "$1"); isNeedEval=t; shift;;
+	--command|-c)	shift; commands+=("$1"); isNeedEval=t; shift;;
 	--with-header)	shift; with=header;;
 	--with-prompt)	shift; with=prompt;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
-	*)		simpleCommands+=("$1"); shift;;
+	*)		if [ "$isNeedEval" ]; then
+			    # Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
+			    # undo the effects of eval.
+			    printf -v quotedSimpleCommand '%q' "$1"
+			    commands+=("$quotedSimpleCommand")
+			else
+			    commands+=("$1")
+			fi
+			shift
+			;;
     esac
 done
-if [ ${#simpleCommands[@]} -gt 0 ]; then
-    if [ "$isNeedEval" ]; then
-	# Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
-	# undo the effects of eval.
-	for s in "${simpleCommands[@]}"
-	do
-	    printf -v quotedS '%q' "$s"
-	    commands+=("$s")
-	done
-    else
-	commands=("${simpleCommands[@]}")
-    fi
-fi
 if [ ${#commands[@]} -eq 0 ]; then
     echo >&2 'ERROR: No COMMAND(s) specified; need to pass -c|--command "COMMANDLINE", or SIMPLECOMMAND.'
     exit 2
@@ -57,7 +62,7 @@ case "$with" in
 	    fi
 	    printf ' %q' "$@"
 	    printf '\n'
-	done # | runWithPrompt --worst-status
+	done | runWithPrompt --worst-status
 	;;
     *)
 	status=0
@@ -68,7 +73,11 @@ case "$with" in
 		header "${firstArg[@]}" "$c"
 		firstArg=()
 	    fi
-	    ${isNeedEval:+eval} "$c" "$@" || status=$?
+	    if [ "$isNeedEval" ]; then
+		eval "$c" '"$@"' || status=$?
+	    else
+		"$c" "$@" || status=$?
+	    fi
 	done
 	exit $status
 	;;

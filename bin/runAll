@@ -36,9 +36,13 @@ case "$with" in
 	;;
     *)
 	status=0
+	typeset -a firstArg=(--first)
 	for c in "${commands[@]}"
 	do
-	    [ "$with" = 'header' ] && printf '[01m%s:[0m\n' "$c"
+	    if [ "$with" = 'header' ]; then
+		header "${firstArg[@]}" "$c"
+		firstArg=()
+	    fi
 	    "$c" "$@" || status=$?
 	done
 	exit $status

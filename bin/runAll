@@ -7,32 +7,57 @@ Invoke each COMMAND sequentially, passing ARGUMENT [...] to each. Overall exit
 status is the highest status of all.
 Can print a header with COMMAND / a full emulated prompt before each COMMAND.
 HELPTEXT
-printf 'Usage: %q %s\n' "$(basename "$1")" '[--with-header|--with-prompt] COMMAND, ... [-- [ARGUMENT [...]] [-?|-h|--help]'
+printf 'Usage: %q %s\n' "$(basename "$1")" '[--with-header|--with-prompt] SIMPLECOMMAND [...] [-- [ARGUMENT [...]] [-?|-h|--help]'
+printf 'Usage: %q %s\n' "$(basename "$1")" '[...] -c|--command "COMMANDLINE" [-c ...] [--] [ARGUMENT [...]] [-?|-h|--help]'
 }
 
 typeset with=
+isNeedEval=
 typeset -a commands=()
+typeset -a simpleCommands=()
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--command|-c)	shift; commands+=(${commands:+;} "$1"); isNeedEval=t; shift;;
 	--with-header)	shift; with=header;;
 	--with-prompt)	shift; with=prompt;;
 	--)		shift; break;;
-	*)		commands+=("$1")
-			shift
-			;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		simpleCommands+=("$1"); shift;;
     esac
 done
-[ ${#commands[@]} -eq 0 ] && { printUsage "$0" >&2; exit 2; }
+if [ ${#simpleCommands[@]} -gt 0 ]; then
+    if [ "$isNeedEval" ]; then
+	# Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
+	# undo the effects of eval.
+	for s in "${simpleCommands[@]}"
+	do
+	    printf -v quotedS '%q' "$s"
+	    commands+=("$s")
+	done
+    else
+	commands=("${simpleCommands[@]}")
+    fi
+fi
+if [ ${#commands[@]} -eq 0 ]; then
+    echo >&2 'ERROR: No COMMAND(s) specified; need to pass -c|--command "COMMANDLINE", or SIMPLECOMMAND.'
+    exit 2
+fi
+
 
 case "$with" in
     prompt)
 	for c in "${commands[@]}"
 	do
-	    printf '%q ' "$c" "$@"
+	    if [ "$isNeedEval" ]; then
+		printf '%s' "$c"
+	    else
+		printf '%q' "$c"
+	    fi
+	    printf ' %q' "$@"
 	    printf '\n'
-	done | runWithPrompt --worst-status
+	done # | runWithPrompt --worst-status
 	;;
     *)
 	status=0
@@ -43,7 +68,7 @@ case "$with" in
 		header "${firstArg[@]}" "$c"
 		firstArg=()
 	    fi
-	    "$c" "$@" || status=$?
+	    ${isNeedEval:+eval} "$c" "$@" || status=$?
 	done
 	exit $status
 	;;

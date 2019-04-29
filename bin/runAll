@@ -77,13 +77,10 @@ fi
 
 case "$with" in
     prompt)
+	quoter='%q'; [ "$isNeedEval" ] && quoter='%s'
 	for c in "${commands[@]}"
 	do
-	    if [ "$isNeedEval" ]; then
-		printf '%s' "$c"
-	    else
-		printf '%q' "$c"
-	    fi
+	    printf "$quoter" "$c"
 	    printf ' %q' "$@"
 	    printf '\n'
 	done | runWithPrompt --worst-status

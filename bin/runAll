@@ -95,9 +95,9 @@ case "$with" in
 		firstArg=()
 	    fi
 	    if [ "$isNeedEval" ]; then
-		eval "$c" '"$@"' || status=$?
+		eval "$c" '"$@"' || { exitStatus=$?; if [ $exitStatus -gt $status ]; then status=$exitStatus; fi; }
 	    else
-		"$c" "$@" || status=$?
+		"$c" "$@" || { exitStatus=$?; if [ $exitStatus -gt $status ]; then status=$exitStatus; fi; }
 	    fi
 	done
 	exit $status

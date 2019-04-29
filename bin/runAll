@@ -24,7 +24,7 @@ do
 			;;
     esac
 done
-[ ${#commands[@]} -eq 0 ] && { printUsage "$0"; exit 2; }
+[ ${#commands[@]} -eq 0 ] && { printUsage "$0" >&2; exit 2; }
 
 case "$with" in
     prompt)

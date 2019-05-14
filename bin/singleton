@@ -101,6 +101,10 @@ execute()
 	"${commands[@]}"
     fi
 }
+relativeTimeDiff()
+{
+    reldate --timespan "+${1:?}" 2>/dev/null || printf '%s\n' "${1:?}s ago"
+}
 
 
 owner="$(getOwner)"
@@ -119,11 +123,10 @@ if [ "${owner:-0}" = 0 ]; then
     if [ "$verifiedOwner" = "$singletonId" ]; then
 	if [ "$isVerbose" ]; then
 	    if [ "$owner" ]; then
-		relativeTimeDiff=$(reldate --timespan "+$timeDiff" 2>/dev/null) || relativeTimeDiff="${timeDiff}s ago"
 		if [ "$isAbandoned" ]; then
-		    printf >&2 '%s had been running under PID %d since %s (%s), but that process does not exist any longer.\n' "$id" "$owner" "$lastRun" "$relativeTimeDiff"
+		    printf >&2 '%s had been running under PID %d since %s (%s), but that process does not exist any longer.\n' "$id" "$owner" "$lastRun" "$(relativeTimeDiff "$timeDiff")"
 		else
-		    printf >&2 '%s last ran %s (%s).\n' "$id" "$lastRun" "$relativeTimeDiff"
+		    printf >&2 '%s last ran %s (%s).\n' "$id" "$lastRun" "$(relativeTimeDiff "$timeDiff")"
 		fi
 	    else
 		printf >&2 '%s never ran so far.\n' "$id"
@@ -141,7 +144,6 @@ fi
 if [ ! "$isQuiet" ]; then
     lastRun="$(marker --time "$escapedId" --format '')"
     timeDiff="$(marker --diff "$escapedId")"
-    relativeTimeDiff=$(reldate --timespan "+$timeDiff" 2>/dev/null) || relativeTimeDiff="${timeDiff}s ago"
-    printf >&2 '%s has been running under PID %d since %s (%s).\n' "$id" "$owner" "$lastRun" "$relativeTimeDiff"
+    printf >&2 '%s has been running under PID %d since %s (%s).\n' "$id" "$owner" "$lastRun" "$(relativeTimeDiff "$timeDiff")"
 fi
 exit 99

@@ -1,0 +1,198 @@
+#!/bin/bash
+shopt -qs extglob
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-q|--quiet|-v|--verbose] [-b|--block [-t|--timeout T[SUFFIX]]] -i|--id ID -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [-?|-h|--help]'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 'Try %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Execute COMMAND unless another instance (that is protected by this wrapper,
+identified via ID) is already running.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --quiet|-q	    Suppresses the default message if command execution is
+		    skipped because of another instance.
+    --verbose|-v    Comments on every outcome (also runs), not just skipped
+		    executions.
+    --block|-b	    Waits until the currently running instance is ended, and
+		    then runs COMMAND.
+    --timeout|-t T[SUFFIX]
+		    Only wait until timeout of T seconds (default: forever) is
+		    reached.
+    --command|-c "COMMANDLINE"
+		    Execute COMMANDLINE(s).
+
+EXIT STATUS:
+    If COMMAND is passed, returns its exit status, or 99:
+    99	Another instance of COMMAND is currently executing.
+	With --block and --timeout: Waiting for the current instance to end
+	timed out.
+    2	Bad invocation, wrong or missing command-line arguments.
+    3	Internal error or failed assertion.
+HELPTEXT
+}
+
+isQuiet=
+isVerbose=
+isBlock=
+timeout=0
+timeoutMessage=
+id=
+escapedId=
+isNeedEval=
+typeset -a commands=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--command|-c)	shift; commands+=(${commands:+;} "$1"); isNeedEval=t; shift;;
+	--quiet|-q)	shift; isQuiet=t;;
+	--verbose|-v)	shift; isVerbose=t;;
+	--block|-b)	shift; isBlock=t;;
+	--timeout|-t)	shift
+			timeoutMessage="; waiting for $1"
+			case "$1" in
+			    +([0-9])?(s))   timeout="${1%s}"; timeoutMessage="; waiting for ${1%s}s";;
+			    +([0-9])m)	    timeout=$((${1%m} * 60));;
+			    +([0-9])h)	    timeout=$((${1%h} * 3600));;
+			    +([0-9])d)	    timeout=$((${1%d} * 86400));;
+			esac
+			shift
+			;;
+	--id|-i)	shift; id="$1"; shift;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+if [ $# -ne 0 ]; then
+    if [ "$isNeedEval" ]; then
+	# Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
+	# undo the effects of eval.
+	commands+=(${commands:+;} $(printf '%q ' "$@"))
+    else
+	commands=("$@")
+    fi
+fi
+if [ ${#commands[@]} -eq 0 ]; then
+	echo >&2 'ERROR: No COMMAND(s) specified; need to pass -c|--command "COMMANDLINE", or SIMPLECOMMAND.'
+	exit 2
+fi
+[ "$id" ] || id="${commands[*]}"    # Generate ID from passed COMMAND(s).
+escapedId="${id//	/ }"
+singletonId=$$
+[ -n "$isBlock" -a -z "$timeoutMessage" ] && timeoutMessage='; waiting indefinitely'
+
+
+marker()
+{
+    executionMarker --group singleton "$@"
+}
+transactionMarker()
+{
+    marker --within-transaction "$$" "$@"
+}
+getOwner()
+{
+    transactionMarker --query "$escapedId" --get-context
+}
+checkout()
+{
+    transactionMarker --update "$escapedId" --context "$singletonId"
+}
+checkin()
+{
+    marker --transactional --update "$escapedId" --context 0
+}
+execute()
+{
+    if [ "$isNeedEval" ]; then
+	eval "${commands[@]}"
+    else
+	"${commands[@]}"
+    fi
+}
+relativeTimeDiff()
+{
+    reldate --timespan "+${1:?}" 2>/dev/null || printf '%s\n' "${1:?}s ago"
+}
+
+tryExecute()
+{
+    marker --start-read-transaction "$$" || exit 3
+    owner="$(getOwner)"
+    isAbandoned=
+    if [ ! "$isQuiet" ] || [ "$isVerbose" ]; then
+	lastRun="$(transactionMarker --time "$escapedId" --format '')"
+	timeDiff="$(transactionMarker --diff "$escapedId")"
+    fi
+    if [ "${owner:-0}" != 0 ] && ! ps -p "$owner" >/dev/null 2>&1; then
+	isAbandoned=t
+	owner=0
+    fi
+    if [ "${owner:-0}" = 0 ]; then
+	if ! marker --silence-transaction-errors --upgrade-to-write-transaction "$$"; then
+	    marker --silence-transaction-errors --end-transaction "$$"
+	    marker --start-write-transaction "$$" || return 0
+	    owner="$(getOwner)"
+	    if [ "${owner:-0}" != 0 ]; then
+		marker --end-transaction "$$"
+		return 0
+	    fi
+	fi
+
+	checkout || exit 3
+	marker --end-transaction "$$" || exit 3
+	if [ "$isVerbose" ]; then
+	    if [ "$owner" ]; then
+		if [ "$isAbandoned" ]; then
+		    printf >&2 '%s had been running under PID %d since %s (%s), but that process does not exist any longer.\n' "$id" "$owner" "$lastRun" "$(relativeTimeDiff "$timeDiff")"
+		else
+		    printf >&2 '%s last ran %s (%s).\n' "$id" "$lastRun" "$(relativeTimeDiff "$timeDiff")"
+		fi
+	    else
+		printf >&2 '%s never ran so far.\n' "$id"
+	    fi
+	fi
+
+	trap "checkin" EXIT
+	execute
+	exit $?
+    fi
+    marker --end-transaction "$$"
+}
+
+isFirst=t
+SECONDS=0
+while [ $timeout -eq 0 -o $SECONDS -lt $timeout ]
+do
+    [ "$isFirst" ] || sleep "${SINGLETON_BLOCK_DELAY:-0.2s}"
+
+    tryExecute
+
+    if [ -n "$isFirst" -a -z "$isQuiet" ]; then
+	printf >&2 '%s has been running under PID %d since %s (%s)%s.\n' "$id" "$owner" "$lastRun" "$(relativeTimeDiff "$timeDiff")" "$timeoutMessage"
+    fi
+    [ "$isBlock" ] || exit 99
+    isFirst=
+done
+if [ -z "$isQuiet" ]; then
+    printf >&2 '%s has been running under PID %d since %s (%s) and did not finish yet.\n' "$id" "$owner" "$lastRun" "$(relativeTimeDiff "$timeDiff")"
+fi
+exit 99

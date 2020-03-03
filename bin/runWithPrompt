@@ -141,12 +141,18 @@ if [ "$isEmulatePrompt" ]; then
 	    exitStatusIndicator="(${exitStatus})"; exitColor=$COLOR_RUNWITHPROMPT_FAILURE
 	fi
 
+	[ $exitStatus -eq 0 ] && eval "${RUNWITHPROMPT_SUCCESS_COMMAND:-}"
+	[ $exitStatus -ne 0 ] && eval "${RUNWITHPROMPT_FAIL_COMMAND:-}"
+
 	timestamp=$(timestamp)
 	printf "%s%-$((${COLUMNS:-80} - ${#timestamp} - 10))s %s %s %s\n$ %s\n" "$exitColor" "$exitStatusIndicator" "$timestamp" "${1:+!}${1:-  }" "$COLOR_RESET" "$2"
     }
 else
     prompt()
     {
+	[ $exitStatus -eq 0 ] && eval "${RUNWITHPROMPT_SUCCESS_COMMAND:-}"
+	[ $exitStatus -ne 0 ] && eval "${RUNWITHPROMPT_FAIL_COMMAND:-}"
+
 	local promptString="${PS1//\\!/${1:- }}"
 	[ $exitStatus -eq 0 ]
 	printf '%s%s\n' "${promptString@P}" "$2"

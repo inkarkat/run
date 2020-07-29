@@ -72,6 +72,7 @@ do
 			    +([0-9])m)	    timeout=$((${1%m} * 60));;
 			    +([0-9])h)	    timeout=$((${1%h} * 3600));;
 			    +([0-9])d)	    timeout=$((${1%d} * 86400));;
+			    *)		    printf >&2 'ERROR: Illegal timeout: %s\n' "$1"; exit 2;;
 			esac
 			shift
 			;;

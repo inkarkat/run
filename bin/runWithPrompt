@@ -195,23 +195,33 @@ do
 	continue
     fi
 
-    if [ "$isNoOutputNoPrompt" ]; then
+    if [ "$isNoOutputNoPrompt" ] || [ "$isNoOutputNoError" ]; then
 	hasOutput=
 	buffer=
-	eval "$command" | { while IFS=$'\n' read -r line || [ -n "$line" ]
-	do
-	    if [ "$hasOutput" ]; then
-		printf '%s\n' "$line"
-		continue
-	    fi
-	    buffer="${buffer}${line}
+	eval "$command" | {
+	    while IFS=$'\n' read -r line || [ -n "$line" ]
+	    do
+		if [ "$hasOutput" ]; then
+		    printf '%s\n' "$line"
+		    continue
+		fi
+		buffer="${buffer}${line}
 "
-	    if [ "$line" ]; then
-		hasOutput=t
+		if [ "$line" ]; then
+		    hasOutput=t
+		    adaptColumnsToFitLongComment; prompt "${COMMENT-$count}" "${COMMAND-$command}"
+		    printf %s "$buffer"
+		fi
+	    done
+	    if [ ! "$hasOutput" ] && [ ! "$isNoOutputNoPrompt" ] && [ "$isNoOutputNoError" ]; then
+		# We're just capturing the output to be able to ignore the exit
+		# status; so do print a prompt (even though no output has
+		# happened).
 		adaptColumnsToFitLongComment; prompt "${COMMENT-$count}" "${COMMAND-$command}"
-		printf %s "$buffer"
 	    fi
-	done; [ "$hasOutput" ]; }
+
+	    [ "$hasOutput" ]
+	}
 	typeset -a ps=("${PIPESTATUS[@]}")
 	commandExitStatus=${ps[0]}
 	outputIndication=${ps[1]}

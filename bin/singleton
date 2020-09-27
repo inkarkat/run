@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-q|--quiet|-v|--verbose] [-b|--block [-t|--timeout T[SUFFIX]]] -i|--id ID -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-q|--quiet|-v|--verbose] [-b|--block [-t|--timeout T[SUFFIX]]] [-i|--id ID] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [-?|-h|--help]'
 }
 printUsage()
 {
@@ -26,6 +26,8 @@ HELPDESCRIPTION
     printShortUsage "$1"
     echo
     cat <<HELPTEXT
+    --id|-i ID	    Identifier for the running COMMAND. If omitted, will use
+		    COMMAND itself.
     --quiet|-q	    Suppresses the default message if command execution is
 		    skipped because of another instance.
     --verbose|-v    Comments on every outcome (also runs), not just skipped

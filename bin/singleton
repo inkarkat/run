@@ -189,13 +189,20 @@ do
 
     tryExecute
 
-    if [ -n "$isFirst" -a -z "$isQuiet" ]; then
+    if [ "$isFirst" ] && [ ! "$isQuiet" ]; then
+	if [ -z "$lastRun" ]; then
+	    marker --start-read-transaction "$$" || continue
+	    lastRun="$(transactionMarker --time "$escapedId" --format '')"
+	    timeDiff="$(marker --transactional --diff "$escapedId")"
+	    marker --end-transaction "$$"
+	fi
 	printf >&2 '%s has been running under PID %d since %s (%s)%s.\n' "$id" "$owner" "$lastRun" "$(relativeTimeDiff "$timeDiff")" "$timeoutMessage"
+	:
     fi
     [ "$isBlock" ] || exit 99
     isFirst=
 done
-if [ -z "$isQuiet" ]; then
+if [ ! "$isQuiet" ]; then
     printf >&2 '%s has been running under PID %d since %s (%s) and did not finish yet.\n' "$id" "$owner" "$lastRun" "$(relativeTimeDiff "$timeDiff")"
 fi
 exit 99

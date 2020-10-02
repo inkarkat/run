@@ -1,6 +1,15 @@
 #!/bin/bash
 shopt -qs extglob
 
+if [ -z "$PGID" ]; then # No parent script has become the process group leader yet.
+    pgid=$(($(ps -o pgid= -p "$$")))	# By defining this, we'll be killing subshell processes of this process group when we're done or interrupted. Any children with the same ambition will defer to us.
+    if [ $$ -eq $pgid ]; then
+	export PGID=$pgid   # We are (already / after setsid) in our own process group, announce our leadership to any children, so that they don't become leaders themselves and thereby decouple themselves from our lifetime control.
+    else
+	exec setsid --wait "${BASH_SOURCE[0]}" "$@" # Use setsid instead of set -m (...) to avoid having another subshell in between.
+    fi
+fi
+
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
@@ -122,6 +131,10 @@ checkout()
 checkin()
 {
     marker --transactional --update "$escapedId" --context 0
+
+    if [ -n "$pgid" ]; then
+	kill -- -$pgid # If we're the leader, kill subshell processes when the script exits.
+    fi
 }
 execute()
 {

@@ -21,6 +21,8 @@ printShortUsage()
     printf 'Usage: %q %s\n' "$(basename "$1")" '[-q|--quiet|-v|--verbose] [-b|--block [-t|--timeout T[SUFFIX]]] [-i|--id ID] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [-?|-h|--help]'
     echo
     printf 'Usage: %q %s\n' "$(basename "$1")" '[-q|--quiet|-v|--verbose] --kill -i|--id ID|-c|--command "COMMANDLINE" [-c ...]|[--] SIMPLECOMMAND'
+    echo
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-q|--quiet|-v|--verbose] --restart [-i|--id ID] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND'
 }
 printUsage()
 {
@@ -43,6 +45,10 @@ HELPDESCRIPTION
     cat <<HELPTEXT
     --kill	    Kill a currently running singleton with ID / running
 		    COMMAND.
+    --restart	    Kill a currently running singleton and then start a new
+		    instance of COMMAND. No guarantee is given that no other
+		    concurrent singleton instance will get in between and launch
+		    itself instead.
     --id|-i ID	    Identifier for the running COMMAND. If omitted, will use
 		    COMMAND itself.
     --quiet|-q	    Suppresses the default message if command execution is
@@ -68,6 +74,7 @@ HELPTEXT
 }
 
 isKill=
+isRestart=
 isQuiet=
 isVerbose=
 isBlock=
@@ -82,6 +89,7 @@ do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--kill)		shift; isKill=t;;
+	--restart)	shift; isRestart=t;;
 	--command|-c)	shift; commands+=(${commands:+;} "$1"); isNeedEval=t; shift;;
 	--quiet|-q)	shift; isQuiet=t;;
 	--verbose|-v)	shift; isVerbose=t;;
@@ -128,7 +136,7 @@ elif [ ${#commands[@]} -eq 0 ]; then
 	echo >&2 'ERROR: No COMMAND(s) specified; need to pass -c|--command "COMMANDLINE", or SIMPLECOMMAND.'
 	exit 2
 fi
-[ "$id" ] || id="${commands[*]}"    # Generate ID from passed COMMAND(s).
+[ -n "$id" ] || id="${commands[*]}"    # Generate ID from passed COMMAND(s).
 escapedId="${id//	/ }"
 singletonId=$$
 [ -n "$isBlock" -a -z "$timeoutMessage" ] && timeoutMessage='; waiting indefinitely'
@@ -271,6 +279,8 @@ SECONDS=0
 if [ "$isKill" ]; then
     killSingleton "$@"
     exit $?
+elif [ "$isRestart" ]; then
+    killSingleton "$@"
 fi
 
 isFirst=t

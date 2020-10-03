@@ -10,6 +10,8 @@ if [ -z "$PGID" ]; then # No parent script has become the process group leader y
     fi
 fi
 
+: ${SINGLETON_KILL_TIMEOUT:=3}
+
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
@@ -234,6 +236,14 @@ if [ "$isKill" ]; then
 
 	if [ "${newOwner:-0}" = 0 ]; then
 	    [ "$isVerbose" ] && printf >&2 '%s has been killed after running under PID %d since %s (%s).\n' "$id" "$owner" "$lastRun" "$(relativeTimeDiff "$timeDiff")"
+	elif [ $SINGLETON_KILL_TIMEOUT -gt 0 ] && type -t retry >/dev/null; then
+	    printf -v quotedEscapedId '%q' "$escapedId"
+	    if retry --interval 0.1 --abort-timeout "$SINGLETON_KILL_TIMEOUT" --command "[ \"\$(executionMarker --group singleton --transactional --query $quotedEscapedId --get-context)\" = 0 ]"; then
+		[ "$isVerbose" ] && printf >&2 '%s has been killed after running under PID %d since %s (%s).\n' "$id" "$owner" "$lastRun" "$(relativeTimeDiff "$timeDiff")"
+	    else
+		[ "$isQuiet" ] || printf >&2 '%s has been running under PID %d since %s (%s) and could not be killed.\n' "$id" "$newOwner" "$lastRun" "$(relativeTimeDiff "$timeDiff")"
+		status=1
+	    fi
 	else
 	    [ "$isQuiet" ] || printf >&2 '%s has been running under PID %d since %s (%s) and could not be killed.\n' "$id" "$newOwner" "$lastRun" "$(relativeTimeDiff "$timeDiff")"
 	    status=1

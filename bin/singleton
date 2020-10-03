@@ -73,8 +73,15 @@ EXIT STATUS:
 HELPTEXT
 }
 
-isKill=
-isRestart=
+abortSingleAction()
+{
+    echo >&2 'ERROR: Only one of --kill or --restart can be passed.'
+    echo >&2
+    printShortUsage "$1" >&2
+    exit 2
+}
+
+action=
 isQuiet=
 isVerbose=
 isBlock=
@@ -88,8 +95,8 @@ while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
-	--kill)		shift; isKill=t;;
-	--restart)	shift; isRestart=t;;
+	--kill)		shift; [ -n "$action" ] && abortSingleAction "$0"; action=kill;;
+	--restart)	shift; [ -n "$action" ] && abortSingleAction "$0"; action=restart;;
 	--command|-c)	shift; commands+=(${commands:+;} "$1"); isNeedEval=t; shift;;
 	--quiet|-q)	shift; isQuiet=t;;
 	--verbose|-v)	shift; isVerbose=t;;
@@ -120,7 +127,7 @@ if [ $# -ne 0 ]; then
 	commands=("$@")
     fi
 fi
-if [ "$isKill" ]; then
+if [ "$action" = kill ]; then
     if [ -n "$id" -a ${#commands[@]} -gt 0 ]; then
 	    echo 'ERROR: Just pass either -i|--id ID or COMMAND for killing, not both.'
 	    echo
@@ -276,12 +283,15 @@ killSingleton()
 
 
 SECONDS=0
-if [ "$isKill" ]; then
-    killSingleton "$@"
-    exit $?
-elif [ "$isRestart" ]; then
-    killSingleton "$@"
-fi
+case "$action" in
+    kill)
+	killSingleton "$@"
+	exit $?
+	;;
+    restart)
+	killSingleton "$@"
+	;;
+esac
 
 isFirst=t
 while [ $timeout -eq 0 -o $SECONDS -lt $timeout ]

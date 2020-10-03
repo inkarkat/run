@@ -214,6 +214,7 @@ tryExecute()
     marker --end-transaction "$$"
 }
 
+SECONDS=0
 if [ "$isKill" ]; then
     status=0
     if [ ! "$isQuiet" ] || [ "$isVerbose" ]; then
@@ -264,7 +265,6 @@ if [ "$isKill" ]; then
 fi
 
 isFirst=t
-SECONDS=0
 while [ $timeout -eq 0 -o $SECONDS -lt $timeout ]
 do
     [ "$isFirst" ] || sleep "${SINGLETON_BLOCK_DELAY:-0.2s}"

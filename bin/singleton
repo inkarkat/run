@@ -10,6 +10,7 @@ if [ -z "$PGID" ]; then # No parent script has become the process group leader y
     fi
 fi
 
+: ${SINGLETON_BLOCK_DELAY:=0.2s}
 : ${SINGLETON_KILL_TIMEOUT:=3}
 
 printShortUsage()
@@ -267,7 +268,7 @@ fi
 isFirst=t
 while [ $timeout -eq 0 -o $SECONDS -lt $timeout ]
 do
-    [ "$isFirst" ] || sleep "${SINGLETON_BLOCK_DELAY:-0.2s}"
+    [ "$isFirst" ] || sleep "$SINGLETON_BLOCK_DELAY"
 
     tryExecute
 

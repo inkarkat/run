@@ -12,6 +12,7 @@ fi
 
 : ${SINGLETON_BLOCK_DELAY:=0.2s}
 : ${SINGLETON_KILL_TIMEOUT:=3}
+: ${SINGLETON_KILL_RETRY_DELAY:=0.2s}
 
 printShortUsage()
 {
@@ -240,7 +241,7 @@ if [ "$isKill" ]; then
 	    [ "$isVerbose" ] && printf >&2 '%s has been killed after running under PID %d since %s (%s).\n' "$id" "$owner" "$lastRun" "$(relativeTimeDiff "$timeDiff")"
 	elif [ $SINGLETON_KILL_TIMEOUT -gt 0 ] && type -t retry >/dev/null; then
 	    printf -v quotedEscapedId '%q' "$escapedId"
-	    if retry --interval 0.1 --abort-timeout "$SINGLETON_KILL_TIMEOUT" --command "[ \"\$(executionMarker --group singleton --transactional --query $quotedEscapedId --get-context)\" = 0 ]"; then
+	    if retry --interval "$SINGLETON_KILL_RETRY_DELAY" --abort-timeout "$SINGLETON_KILL_TIMEOUT" --command "[ \"\$(executionMarker --group singleton --transactional --query $quotedEscapedId --get-context)\" = 0 ]"; then
 		[ "$isVerbose" ] && printf >&2 '%s has been killed after running under PID %d since %s (%s).\n' "$id" "$owner" "$lastRun" "$(relativeTimeDiff "$timeDiff")"
 	    else
 		[ "$isQuiet" ] || printf >&2 '%s has been running under PID %d since %s (%s) and could not be killed.\n' "$id" "$newOwner" "$lastRun" "$(relativeTimeDiff "$timeDiff")"

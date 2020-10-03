@@ -216,8 +216,8 @@ tryExecute()
     marker --end-transaction "$$"
 }
 
-SECONDS=0
-if [ "$isKill" ]; then
+killSingleton()
+{
     status=0
     if [ ! "$isQuiet" ] || [ "$isVerbose" ]; then
 	marker --start-read-transaction "$$" || exit 3
@@ -231,7 +231,7 @@ if [ "$isKill" ]; then
 
     if [ "${owner:-0}" = 0 ]; then
 	[ "$isQuiet" ] || printf >&2 'No instance of %s is currently running.\n' "$id"
-	exit 1
+	return 1
     fi
 
     if kill "$owner" 2>/dev/null; then
@@ -263,7 +263,14 @@ if [ "$isKill" ]; then
 	marker --end-transaction "$$" || exit 3
     fi
 
-    exit $status
+    return $status
+}
+
+
+SECONDS=0
+if [ "$isKill" ]; then
+    killSingleton "$@"
+    exit $?
 fi
 
 isFirst=t

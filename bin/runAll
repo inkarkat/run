@@ -61,7 +61,7 @@ do
 			    # Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
 			    # undo the effects of eval.
 			    printf -v quotedSimpleCommand '%q' "$1"
-			    commands+=("$quotedSimpleCommand")
+			    commands+=("${quotedSimpleCommand% }")
 			else
 			    commands+=("$1")
 			fi

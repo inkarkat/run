@@ -2,7 +2,7 @@
 
 printShortUsage()
 {
-    printf 'Usage: echo COMMANDLINES | %q %s\n' "$(basename "$1")" '[--trailing-prompt|--no-trailing-prompt] [--no-output-no-prompt] [--no-output-no-error] [--no-success-no-count|--no-count-on N] [--emulate-prompt] [--worst-status] [-c|--comment COMMENT] [--summarize-failed ERROR-TEXT [--summarize-failed-separator SEP]] [-?|-h|--help]'
+    printf 'Usage: echo COMMANDLINES | %q %s\n' "$(basename "$1")" '[--trailing-prompt|--no-trailing-prompt] [--no-output-no-prompt] [--no-output-no-error] [--no-success-no-count|--no-count-on N] [--exit-on-success|--exit-on-failure|--exit-on NUM] [--emulate-prompt] [--worst-status] [-c|--comment COMMENT] [--summarize-failed ERROR-TEXT [--summarize-failed-separator SEP]] [-?|-h|--help]'
     printf 'Usage: %q %s <<EOF\n  COMMANDS\nEOF\n' "$(basename "$1")" '[...]'
 }
 printUsage()
@@ -52,6 +52,10 @@ HELPDESCRIPTION
 			count in the prompt. This can be used to suppress
 			certain exceptional conditions, and is therefore more
 			fine-grained than --no-success-no-count.
+    --exit-on-success	Stop execution if COMMAND is successful.
+    --exit-on-failure	Stop execution if COMMAND is unsuccessful (like set -e).
+    --exit-on NUM	Stop execution if COMMAND exits with NUM.
+    --exit-unless NUM	Stop execution if COMMAND does not exit with NUM.
     --emulate-prompt	Use the prompt emulation even when Bash (4.4+) supports
 			the rendering of PS1.
     --worst-status	Return the highest exit status of all COMMANDS instead
@@ -81,6 +85,8 @@ isNoOutputNoPrompt=
 isNoOutputNoError=
 isNoSuccessNoCount=
 noCountOn=
+exitOn=
+exitComparison=-eq
 isWorstStatus=
 isSummarizeFailed=
 summarizeFailedSeparator=' '
@@ -95,6 +101,10 @@ do
 	--no-output-no-error)	shift; isNoOutputNoError=t;;
 	--no-success-no-count)	shift; isNoSuccessNoCount=t;;
 	--no-count-on)		shift; noCountOn="$1"; shift;;
+	--exit-on-success)	shift; exitOn=0; exitComparison=-eq;;
+	--exit-on-failure)	shift; exitOn=0; exitComparison=-ne;;
+	--exit-on)		shift; exitOn="$1"; shift; exitComparison=-eq;;
+	--exit-unless)		shift; exitOn="$1"; shift; exitComparison=-ne;;
 	--emulate-prompt)	shift; isEmulatePrompt=t;;
 	--worst-status)		shift; isWorstStatus=t;;
 	--comment|-c)		shift; COMMENT="$1"; shift;;
@@ -238,12 +248,16 @@ do
 	commandExitStatus=$?
 	exitStatus=$commandExitStatus
     fi
-
     [ $exitStatus -eq 0 -o -z "$isSummarizeFailed" ] || summarizeFailures="${summarizeFailures}${summarizeFailures:+$summarizeFailedSeparator}${COMMENT-$count}"
     if [ ! "$isWorstStatus" -o $exitStatus -gt $overallExitStatus ]; then
 	overallExitStatus=$exitStatus
     fi
     [ -n "$isNoSuccessNoCount" -a $commandExitStatus -ne 0 ] || [ "$noCountOn" = "$commandExitStatus" ] || let count+=1
+
+    if [ "$exitOn" ] && [ $commandExitStatus $exitComparison $exitOn ]; then
+	command=''  # Don't repeat the last command in the trailing prompt; the loop would regularly end with an empty command, too.
+	break
+    fi
 done
 if [ "$isTrailingPrompt" -a ${count:-0} -gt 0 ]; then
     [ "$summarizeFailures" ] && command="# ${summarizeFailedPrefix}$summarizeFailures"

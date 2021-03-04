@@ -154,7 +154,7 @@ else
 	[ $exitStatus -ne 0 ] && eval "${RUNWITHPROMPT_FAIL_COMMAND:-}"
 
 	local promptString="${PS1//\\!/${1:- }}"
-	[ $exitStatus -eq 0 ]
+	[ $exitStatus -eq 0 ] || (exit $exitStatus)
 	printf '%s%s\n' "${promptString@P}" "$2"
     }
 fi

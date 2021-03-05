@@ -87,6 +87,7 @@ isTrailingPrompt=t
 isEmulatePrompt=t; [ "${BASH_VERSINFO:-}" ] && [ \( ${BASH_VERSINFO[0]} -eq 4 -a ${BASH_VERSINFO[1]} -ge 4 \) -o ${BASH_VERSINFO[0]} -gt 4 ] && isEmulatePrompt=
 isNoOutputNoPrompt=
 isNoOutputNoError=
+outputRedir=
 isNoSuccessNoCount=
 noCountOn=
 exitOn=
@@ -102,8 +103,8 @@ do
 	--initial-status)	shift; exitStatus="$1"; shift;;
 	--trailing-prompt)	shift; isTrailingPrompt=t;;
 	--no-trailing-prompt)	shift; isTrailingPrompt=;;
-	--no-output-no-prompt)	shift; isNoOutputNoPrompt=t;;
-	--no-output-no-error)	shift; isNoOutputNoError=t;;
+	--no-output-no-prompt)	shift; isNoOutputNoPrompt=t; outputRedir='2>&1';;
+	--no-output-no-error)	shift; isNoOutputNoError=t; outputRedir='2>&1';;
 	--no-success-no-count)	shift; isNoSuccessNoCount=t;;
 	--no-count-on)		shift; noCountOn="$1"; shift;;
 	--exit-on-success)	shift; exitOn=0; exitComparison=-eq;;
@@ -212,7 +213,7 @@ do
     if [ "$isNoOutputNoPrompt" ] || [ "$isNoOutputNoError" ]; then
 	hasOutput=
 	buffer=
-	eval "$command" | {
+	eval "$command" $outputRedir | {
 	    while IFS=$'\n' read -r line || [ -n "$line" ]
 	    do
 		if [ "$hasOutput" ]; then

@@ -3,6 +3,7 @@
 printShortUsage()
 {
     printf 'Usage: echo COMMANDLINES | %q %s\n' "$(basename "$1")" '[--initial-status NUM] [--trailing-prompt|--no-trailing-prompt] [--no-output-no-prompt] [--no-output-no-error] [--no-success-no-count|--no-count-on N] [--exit-on-success|--exit-on-failure|--exit-on NUM] [--emulate-prompt] [--worst-status] [-c|--comment COMMENT] [--summarize-failed ERROR-TEXT [--summarize-failed-separator SEP]] [-?|-h|--help]'
+    echo
     printf 'Usage: %q %s <<EOF\n  COMMANDS\nEOF\n' "$(basename "$1")" '[...]'
 }
 printUsage()
@@ -26,6 +27,7 @@ command-line.
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
+    echo
     cat <<HELPTEXT
     --initial-status NUM
 			Indicate an exit status NUM in the very first prompt (as

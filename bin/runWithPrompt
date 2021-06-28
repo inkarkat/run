@@ -255,11 +255,11 @@ do
 	commandExitStatus=$?
 	exitStatus=$commandExitStatus
     fi
+    [ -n "$isNoSuccessNoCount" -a $commandExitStatus -ne 0 ] || [ "$noCountOn" = "$commandExitStatus" ] || let count+=1
     [ $exitStatus -eq 0 -o -z "$isSummarizeFailed" ] || summarizeFailures="${summarizeFailures}${summarizeFailures:+$summarizeFailedSeparator}${COMMENT-$count}"
     if [ ! "$isWorstStatus" -o $exitStatus -gt $overallExitStatus ]; then
 	overallExitStatus=$exitStatus
     fi
-    [ -n "$isNoSuccessNoCount" -a $commandExitStatus -ne 0 ] || [ "$noCountOn" = "$commandExitStatus" ] || let count+=1
 
     if [ "$exitOn" ] && [ $commandExitStatus $exitComparison $exitOn ]; then
 	command=''  # Don't repeat the last command in the trailing prompt; the loop would regularly end with an empty command, too.

@@ -1,5 +1,8 @@
 #!/bin/bash
 
+: ${RUNALL_ARG_MARKER='{}'}
+argMarker="$RUNALL_ARG_MARKER"; unset RUNALL_ARG_MARKER
+
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
@@ -18,7 +21,8 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-Invoke each COMMAND sequentially, passing ARGUMENT [...] to each.
+Invoke each COMMAND sequentially, passing all ARGUMENT(s) (which ${argMarker:+either }are
+appended to${argMarker:+ or replace any $argMarker marker inside} COMMANDLINE) to each COMMAND.
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
@@ -41,6 +45,7 @@ HELPDESCRIPTION
     --comment COMMENT
     --summarize-failed ERROR-TEXT
     --summarize-failed-separator SEP
+
 EXIT STATUS:
 Overall exit status is the highest status of all. If you specify any
 runWithPrompt argument, --worst-status needs to be explicitly passed.
@@ -50,26 +55,14 @@ HELPTEXT
     printf '%q %s\n' "$(basename "$1")" "--command 'bash -c \"ping -c1 -q \$2 && echo \$1 is up.\" bash' -- webserver wotan"
 }
 
-# In order to maintain the order of commands, we need to investigate beforehand
-# whether eval is needed.
-isNeedEval=
-for arg
-do
-    case "$arg" in
-	--command|-c)	isNeedEval=t;;
-	--)		break;;
-    esac
-done
-
 with=
 typeset -a commands=()
-typeset -a simpleCommands=()
 typeset -a runWithPromptArgs=()
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
-	--command|-c)	shift; commands+=("$1"); isNeedEval=t; shift;;
+	--command|-c)	shift; commands+=("$1"); shift;;
 	--with-header)	shift; with=header;;
 	--with-prompt)	shift; with=prompt;;
 
@@ -80,15 +73,15 @@ do
 
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
-	*)		if [ "$isNeedEval" ]; then
-			    # Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
-			    # undo the effects of eval.
-			    printf -v quotedSimpleCommand '%q' "$1"
-			    commands+=("${quotedSimpleCommand% }")
-			else
-			    commands+=("$1")
-			fi
-			shift
+	*)		typeset -a cmd=()
+			while [ $# -gt 0 -a "$1" != '--' ]
+			do
+			    cmd+=("$1")
+			    shift
+			done
+			printf -v quotedSimpleCommand '%q ' "${cmd[@]}"; quotedSimpleCommand="${quotedSimpleCommand% }"
+			printf -v escapedArgMarker %q "$argMarker"
+			commands+=("${quotedSimpleCommand//"$escapedArgMarker"/$argMarker}")	# %q escapes {}, we don't want that to have it interpolated later.
 			;;
     esac
 done
@@ -101,12 +94,16 @@ fi
 case "$with" in
     prompt)
 	[ ${#runWithPromptArgs[@]} -eq 0 ] && runWithPromptArgs=(--worst-status)
-	quoter='%q'; [ "$isNeedEval" ] && quoter='%s'
 	for c in "${commands[@]}"
 	do
-	    printf "$quoter" "$c"
-	    printf ' %q' "$@"
-	    printf '\n'
+	    if [[ "$c" =~ \{\} ]]; then
+		printf -v quotedArgs '%q ' "$@"; quotedArgs="${quotedArgs% }"
+		printf '%s\n' "${c//"$argMarker"/$quotedArgs}"
+	    else
+		printf %s "$c"
+		printf ' %q' "$@"
+		printf '\n'
+	    fi
 	done | runWithPrompt "${runWithPromptArgs[@]}"
 	;;
     *)
@@ -118,11 +115,12 @@ case "$with" in
 		header "${firstArg[@]}" "$c"
 		firstArg=()
 	    fi
-	    if [ "$isNeedEval" ]; then
-		eval "$c" '"$@"' || { exitStatus=$?; if [ $exitStatus -gt $status ]; then status=$exitStatus; fi; }
-	    else
-		"$c" "$@" || { exitStatus=$?; if [ $exitStatus -gt $status ]; then status=$exitStatus; fi; }
-	    fi
+
+	    printf -v quotedArgs '%q ' "$@"; quotedArgs="${quotedArgs% }"
+	    typeset -a a=("$@")
+	    interpolatedCommand="${c//"$argMarker"/$quotedArgs}"
+	    [ "$interpolatedCommand" = "$c" ] || a=()
+	    eval "$interpolatedCommand" '"${a[@]}"' || { exitStatus=$?; if [ $exitStatus -gt $status ]; then status=$exitStatus; fi; }
 	done
 	exit $status
 	;;

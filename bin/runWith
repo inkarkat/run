@@ -1,0 +1,136 @@
+#!/bin/bash
+
+printShortUsage()
+{
+    printf 'Usage: echo COMMANDLINES | %q %s\n' "$(basename "$1")" '[--initial-status NUM] [--trailing-prompt|--no-trailing-prompt] [--no-output-no-prompt] [--no-output-no-error] [--no-success-no-count|--no-count-on N] [--exit-on-success|--exit-on-failure|--exit-on NUM] [--emulate-prompt] [--worst-status] [-c|--comment COMMENT] [--summarize-failed ERROR-TEXT [--summarize-failed-separator SEP]] [-?|-h|--help]'
+    echo
+    printf 'Usage: %q %s <<EOF\n  COMMANDS\nEOF\n' "$(basename "$1")" '[...]'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Run the COMMANDS read from stdin, but stop when one of the supplied conditions
+becomes true, or summarize the failures at the end. This is a drop-in
+replacement of runWithPrompt that does not create prompts.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --emulate-prompt	runWithPrompt arguments that are ignored here.
+    --initial-status NUM
+    --trailing-prompt
+    --no-trailing-prompt
+    --no-output-no-prompt
+    --no-output-no-error
+    --no-success-no-count
+			If a COMMAND fails, do not increase the count.
+    --no-count-on N	If the exit status of COMMAND is N, do not increase the
+			count.
+    --exit-on-success	Stop execution if COMMAND is successful.
+    --exit-on-failure	Stop execution if COMMAND is unsuccessful (like set -e).
+    --exit-on NUM	Stop execution if COMMAND exits with NUM.
+    --exit-unless NUM	Stop execution if COMMAND does not exit with NUM.
+    --worst-status	Return the highest exit status of all COMMANDS instead
+			of the exit status of the last COMMAND.
+    --comment|-c COMMENT
+			Use COMMENT instead of the default counter of executed
+			COMMANDS.
+			You can also update this within COMMANDS by setting the
+			COMMENT=... variable. If you do this on a separate line
+			with the form COMMENT='text' or COMMENT="text" or
+			COMMENT=text, the update will happen silently; i.e.
+			without printing that command-line.
+    --summarize-failed ERROR-TEXT
+			For each failed line in COMMANDS, record the counter /
+			COMMENT and summarize those failures at the end as a
+			final line with ERROR-TEXT COMMENT1 COMMENT2 ...
+    --summarize-failed-separator SEP
+			Use SEP instead of a space in between COMMENT1 COMMENT2.
+HELPTEXT
+}
+
+exitStatus=0
+isNoSuccessNoCount=
+noCountOn=
+exitOn=
+exitComparison=-eq
+isWorstStatus=
+isSummarizeFailed=
+summarizeFailedSeparator=' '
+summarizeFailedPrefix=
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--initial-status)	shift; shift;;
+	--trailing-prompt)	shift;;
+	--no-trailing-prompt)	shift;;
+	--no-output-no-prompt)	shift;;
+	--no-output-no-error)	shift;;
+	--no-success-no-count)	shift; isNoSuccessNoCount=t;;
+	--no-count-on)		shift; noCountOn="$1"; shift;;
+	--exit-on-success)	shift; exitOn=0; exitComparison=-eq;;
+	--exit-on-failure)	shift; exitOn=0; exitComparison=-ne;;
+	--exit-on)		shift; exitOn="$1"; shift; exitComparison=-eq;;
+	--exit-unless)		shift; exitOn="$1"; shift; exitComparison=-ne;;
+	--emulate-prompt)	shift;;
+	--worst-status)		shift; isWorstStatus=t;;
+	--comment|-c)		shift; COMMENT="$1"; shift;;
+	--summarize-failed)	shift; isSummarizeFailed=t; summarizeFailedPrefix="$1"; shift;;
+	--summarize-failed-separator)	shift; summarizeFailedSeparator="$1"; shift;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+[ $# -gt 0 ] && { printUsage "$0" >&2; exit 2; }
+
+count=
+overallExitStatus=0
+summarizeFailures=
+
+# Prevent that read command(s) consume following commands by reading from stdin.
+# Instead, redirect stdin directly from the terminal (if available), or the null
+# device. Note: For some commands, you can also directly influence their
+# behavior; e.g. ssh -n.
+exec 3<&0
+# Force reading directly from terminal / null device if stdin is redirected,
+# to avoid consuming input.
+{ exec 0</dev/tty; } 2>/dev/null || exec </dev/null
+
+while IFS=$'\n' <&3 read -r command || [ -n "$command" ]
+do
+    if  [[ "$command" =~ ^[[:space:]]*(COMMENT|COMMAND)=\"[^\"]*\"[[:space:]]*$ ]] || \
+	[[ "$command" =~ ^[[:space:]]*(COMMENT|COMMAND)=\'[^\']*\'[[:space:]]*$ ]] || \
+	[[ "$command" =~ ^[[:space:]]*(COMMENT|COMMAND)=[^\'\"\;\&\|]*[[:space:]]*$ ]]; then
+	# This command solely sets the COMMENT or COMMAND; don't log it, just
+	# silently execute it.
+	eval "$command"
+	continue
+    fi
+
+    eval "$command"
+    exitStatus=$?
+    [ -n "$isNoSuccessNoCount" -a $exitStatus -ne 0 ] || [ "$noCountOn" = "$exitStatus" ] || let count+=1
+    [ $exitStatus -eq 0 -o -z "$isSummarizeFailed" ] || summarizeFailures="${summarizeFailures}${summarizeFailures:+$summarizeFailedSeparator}${COMMENT-$count}"
+    if [ ! "$isWorstStatus" -o $exitStatus -gt $overallExitStatus ]; then
+	overallExitStatus=$exitStatus
+    fi
+
+    if [ "$exitOn" ] && [ $exitStatus $exitComparison $exitOn ]; then
+	break
+    fi
+done
+[ "$summarizeFailures" ] && printf >&2 '%s%s\n' "$summarizeFailedPrefix" "$summarizeFailures"
+
+exit $overallExitStatus

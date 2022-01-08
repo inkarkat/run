@@ -305,7 +305,7 @@ do
 	if [ -z "$lastRun" ]; then
 	    marker --start-read-transaction "$$" || continue
 	    lastRun="$(transactionMarker --time "$escapedId" --format '')"
-	    timeDiff="$(marker --transactional --diff "$escapedId")"
+	    timeDiff="$(transactionMarker --diff "$escapedId")"
 	    marker --end-transaction "$$"
 	fi
 	printf >&2 '%s has been running under PID %d since %s (%s)%s.\n' "$id" "$owner" "$lastRun" "$(relativeTimeDiff "$timeDiff")" "$timeoutMessage"

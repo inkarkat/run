@@ -182,6 +182,10 @@ execute()
 	"${commands[@]}"
     fi
 }
+getLastRun()
+{
+    transactionMarker --query "$escapedId" --get-time '' --get-diff '(%R)' | joinBy - ' '
+}
 
 tryExecute()
 {
@@ -189,7 +193,7 @@ tryExecute()
     owner="$(getOwner)"
     isAbandoned=
     if [ ! "$isQuiet" ] || [ "$isVerbose" ]; then
-	lastRun="$(transactionMarker --query "$escapedId" --get-time '' --get-diff '(%R)' | joinBy - ' ')"
+	lastRun="$(getLastRun)"
     fi
     if [ "${owner:-0}" != 0 ] && ! ps -p "$owner" >/dev/null 2>&1; then
 	isAbandoned=t
@@ -233,7 +237,7 @@ killSingleton()
     if [ ! "$isQuiet" ] || [ "$isVerbose" ]; then
 	marker --start-read-transaction "$$" || exit 3
 	owner="$(getOwner)"
-	lastRun="$(transactionMarker --query "$escapedId" --get-time '' --get-diff '(%R)' | joinBy - ' ')"
+	lastRun="$(getLastRun)"
 	marker --end-transaction "$$" || exit 3
     else
 	owner="$(marker --transactional --query "$escapedId" --get-context)"
@@ -298,7 +302,7 @@ do
     if [ "$isFirst" ] && [ ! "$isQuiet" ]; then
 	if [ -z "$lastRun" ]; then
 	    marker --start-read-transaction "$$" || continue
-	    lastRun="$(transactionMarker --query "$escapedId" --get-time '' --get-diff '(%R)' | joinBy - ' ')"
+	    lastRun="$(getLastRun)"
 	    marker --end-transaction "$$"
 	fi
 	printf >&2 '%s has been running under PID %d since %s%s.\n' "$id" "$owner" "$lastRun" "$timeoutMessage"

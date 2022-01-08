@@ -182,9 +182,9 @@ execute()
 	"${commands[@]}"
     fi
 }
-relativeTimeDiff()
+getLastRun()
 {
-    reldate --timespan "+${1:?}" 2>/dev/null || printf '%s\n' "${1:?}s ago"
+    transactionMarker --query "$escapedId" --get-time '' --get-diff '(%R)' | joinBy - ' '
 }
 
 tryExecute()
@@ -193,8 +193,7 @@ tryExecute()
     owner="$(getOwner)"
     isAbandoned=
     if [ ! "$isQuiet" ] || [ "$isVerbose" ]; then
-	lastRun="$(transactionMarker --time "$escapedId" --format '')"
-	timeDiff="$(transactionMarker --diff "$escapedId")"
+	lastRun="$(getLastRun)"
     fi
     if [ "${owner:-0}" != 0 ] && ! ps -p "$owner" >/dev/null 2>&1; then
 	isAbandoned=t
@@ -216,9 +215,9 @@ tryExecute()
 	if [ "$isVerbose" ]; then
 	    if [ "$owner" ]; then
 		if [ "$isAbandoned" ]; then
-		    printf >&2 '%s had been running under PID %d since %s (%s), but that process does not exist any longer.\n' "$id" "$owner" "$lastRun" "$(relativeTimeDiff "$timeDiff")"
+		    printf >&2 '%s had been running under PID %d since %s, but that process does not exist any longer.\n' "$id" "$owner" "$lastRun"
 		else
-		    printf >&2 '%s last ran %s (%s).\n' "$id" "$lastRun" "$(relativeTimeDiff "$timeDiff")"
+		    printf >&2 '%s last ran %s.\n' "$id" "$lastRun"
 		fi
 	    else
 		printf >&2 '%s never ran so far.\n' "$id"
@@ -238,8 +237,7 @@ killSingleton()
     if [ ! "$isQuiet" ] || [ "$isVerbose" ]; then
 	marker --start-read-transaction "$$" || exit 3
 	owner="$(getOwner)"
-	lastRun="$(transactionMarker --time "$escapedId" --format '')"
-	timeDiff="$(transactionMarker --diff "$escapedId")"
+	lastRun="$(getLastRun)"
 	marker --end-transaction "$$" || exit 3
     else
 	owner="$(marker --transactional --query "$escapedId" --get-context)"
@@ -254,24 +252,24 @@ killSingleton()
 	newOwner="$(marker --transactional --query "$escapedId" --get-context)"
 
 	if [ "${newOwner:-0}" = 0 ]; then
-	    [ "$isVerbose" ] && printf >&2 '%s has been killed after running under PID %d since %s (%s).\n' "$id" "$owner" "$lastRun" "$(relativeTimeDiff "$timeDiff")"
+	    [ "$isVerbose" ] && printf >&2 '%s has been killed after running under PID %d since %s.\n' "$id" "$owner" "$lastRun"
 	elif [ $SINGLETON_KILL_TIMEOUT -gt 0 ] && type -t retry >/dev/null; then
 	    printf -v quotedEscapedId '%q' "$escapedId"
 	    if retry --interval "$SINGLETON_KILL_RETRY_DELAY" --abort-timeout "$SINGLETON_KILL_TIMEOUT" --command "[ \"\$(executionMarker --base-type runtime --group singleton --transactional --query $quotedEscapedId --get-context)\" = 0 ]"; then
-		[ "$isVerbose" ] && printf >&2 '%s has been killed after running under PID %d since %s (%s).\n' "$id" "$owner" "$lastRun" "$(relativeTimeDiff "$timeDiff")"
+		[ "$isVerbose" ] && printf >&2 '%s has been killed after running under PID %d since %s.\n' "$id" "$owner" "$lastRun"
 	    else
-		[ "$isQuiet" ] || printf >&2 '%s has been running under PID %d since %s (%s) and could not be killed.\n' "$id" "$newOwner" "$lastRun" "$(relativeTimeDiff "$timeDiff")"
+		[ "$isQuiet" ] || printf >&2 '%s has been running under PID %d since %s and could not be killed.\n' "$id" "$newOwner" "$lastRun"
 		status=1
 	    fi
 	else
-	    [ "$isQuiet" ] || printf >&2 '%s has been running under PID %d since %s (%s) and could not be killed.\n' "$id" "$newOwner" "$lastRun" "$(relativeTimeDiff "$timeDiff")"
+	    [ "$isQuiet" ] || printf >&2 '%s has been running under PID %d since %s and could not be killed.\n' "$id" "$newOwner" "$lastRun"
 	    status=1
 	fi
     elif ps -p "$owner" >/dev/null 2>&1; then
-	[ "$isQuiet" ] || printf >&2 '%s has been running under PID %d since %s (%s) and could not be killed.\n' "$id" "$owner" "$lastRun" "$(relativeTimeDiff "$timeDiff")"
+	[ "$isQuiet" ] || printf >&2 '%s has been running under PID %d since %s and could not be killed.\n' "$id" "$owner" "$lastRun"
 	status=1
     else
-	[ "$isVerbose" ] && printf >&2 '%s had been running under PID %d since %s (%s), but that process does not exist any longer.\n' "$id" "$owner" "$lastRun" "$(relativeTimeDiff "$timeDiff")"
+	[ "$isVerbose" ] && printf >&2 '%s had been running under PID %d since %s, but that process does not exist any longer.\n' "$id" "$owner" "$lastRun"
 
 	marker --start-write-transaction "$$" || exit 3
 	currentOwner="$(getOwner)"
@@ -304,17 +302,16 @@ do
     if [ "$isFirst" ] && [ ! "$isQuiet" ]; then
 	if [ -z "$lastRun" ]; then
 	    marker --start-read-transaction "$$" || continue
-	    lastRun="$(transactionMarker --time "$escapedId" --format '')"
-	    timeDiff="$(marker --transactional --diff "$escapedId")"
+	    lastRun="$(getLastRun)"
 	    marker --end-transaction "$$"
 	fi
-	printf >&2 '%s has been running under PID %d since %s (%s)%s.\n' "$id" "$owner" "$lastRun" "$(relativeTimeDiff "$timeDiff")" "$timeoutMessage"
+	printf >&2 '%s has been running under PID %d since %s%s.\n' "$id" "$owner" "$lastRun" "$timeoutMessage"
 	:
     fi
     [ "$isBlock" ] || exit 99
     isFirst=
 done
 if [ ! "$isQuiet" ]; then
-    printf >&2 '%s has been running under PID %d since %s (%s) and did not finish yet.\n' "$id" "$owner" "$lastRun" "$(relativeTimeDiff "$timeDiff")"
+    printf >&2 '%s has been running under PID %d since %s and did not finish yet.\n' "$id" "$owner" "$lastRun"
 fi
 exit 99

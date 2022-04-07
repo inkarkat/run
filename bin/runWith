@@ -122,7 +122,7 @@ do
     eval "$command"
     exitStatus=$?
     [ -n "$isNoSuccessNoCount" -a $exitStatus -ne 0 ] || [ "$noCountOn" = "$exitStatus" ] || let count+=1
-    [ $exitStatus -eq 0 -o -z "$isSummarizeFailed" ] || summarizeFailures="${summarizeFailures}${summarizeFailures:+$summarizeFailedSeparator}${COMMENT-$count}"
+    [ $exitStatus -eq 0 -o -z "$isSummarizeFailed" ] || summarizeFailures+="${summarizeFailures:+$summarizeFailedSeparator}${COMMENT-$count}"
     if [ ! "$isWorstStatus" -o $exitStatus -gt $overallExitStatus ]; then
 	overallExitStatus=$exitStatus
     fi

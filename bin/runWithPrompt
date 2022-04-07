@@ -222,8 +222,7 @@ do
 		    printf '%s\n' "$line"
 		    continue
 		fi
-		buffer="${buffer}${line}
-"
+		buffer+="$line"$'\n'
 		if [ "$line" ]; then
 		    hasOutput=t
 		    adaptColumnsToFitLongComment; prompt "${COMMENT-$count}" "${COMMAND-$command}"
@@ -256,7 +255,7 @@ do
 	exitStatus=$commandExitStatus
     fi
     [ -n "$isNoSuccessNoCount" -a $commandExitStatus -ne 0 ] || [ "$noCountOn" = "$commandExitStatus" ] || let count+=1
-    [ $exitStatus -eq 0 -o -z "$isSummarizeFailed" ] || summarizeFailures="${summarizeFailures}${summarizeFailures:+$summarizeFailedSeparator}${COMMENT-$count}"
+    [ $exitStatus -eq 0 -o -z "$isSummarizeFailed" ] || summarizeFailures+="${summarizeFailures:+$summarizeFailedSeparator}${COMMENT-$count}"
     if [ ! "$isWorstStatus" -o $exitStatus -gt $overallExitStatus ]; then
 	overallExitStatus=$exitStatus
     fi

@@ -2,7 +2,7 @@
 
 printShortUsage()
 {
-    printf 'Usage: echo COMMANDLINES | %q %s\n' "$(basename "$1")" '[--initial-status NUM] [--trailing-prompt|--no-trailing-prompt] [--no-output-no-prompt] [--no-output-no-error] [--no-success-no-count|--no-count-on N] [--exit-on-success|--exit-on-failure|--exit-on NUM] [--emulate-prompt] [--worst-status] [-c|--comment COMMENT] [--summarize-failed ERROR-TEXT [--summarize-failed-separator SEP]] [-?|-h|--help]'
+    printf 'Usage: echo COMMANDLINES | [RUNWITHPROMPT_SINK=FILESPEC|&N] %q %s\n' "$(basename "$1")" '[--initial-status NUM] [--trailing-prompt|--no-trailing-prompt] [--no-output-no-prompt] [--no-output-no-error] [--no-success-no-count|--no-count-on N] [--exit-on-success|--exit-on-failure|--exit-on NUM] [--emulate-prompt] [--worst-status] [-c|--comment COMMENT] [--summarize-failed ERROR-TEXT [--summarize-failed-separator SEP]] [-?|-h|--help]'
     echo
     printf 'Usage: %q %s <<EOF\n  COMMANDS\nEOF\n' "$(basename "$1")" '[...]'
 }
@@ -141,6 +141,11 @@ fi
 : ${COLOR_RUNWITHPROMPT_FAILURE:='[00;37;41m'}
 : ${RUNWITHPROMPT_TIMESTAMP:=%d-%b-%Y %T}
 
+case "$RUNWITHPROMPT_SINK" in
+    '')		exec 4>&1;;
+    \&[0-9])	eval "exec 4>$RUNWITHPROMPT_SINK";;
+    ?*)		exec 4>>"$RUNWITHPROMPT_SINK";;
+esac
 
 timestamp()
 {
@@ -163,7 +168,7 @@ if [ "$isEmulatePrompt" ]; then
 	[ $exitStatus -ne 0 ] && eval "${RUNWITHPROMPT_FAIL_COMMAND:-}"
 
 	timestamp=$(timestamp)
-	printf "%s%-$((${COLUMNS:-80} - ${#timestamp} - 10))s %s %s %s\n$ %s\n" "$exitColor" "$exitStatusIndicator" "$timestamp" "${1:+!}${1:-  }" "$COLOR_RESET" "$2"
+	printf >&4 "%s%-$((${COLUMNS:-80} - ${#timestamp} - 10))s %s %s %s\n$ %s\n" "$exitColor" "$exitStatusIndicator" "$timestamp" "${1:+!}${1:-  }" "$COLOR_RESET" "$2"
     }
 else
     prompt()
@@ -173,7 +178,7 @@ else
 
 	local promptString="${PS1//\\!/${1:- }}"
 	[ $exitStatus -eq 0 ] || (exit $exitStatus)
-	printf '%s%s\n' "${promptString@P}" "$2"
+	printf >&4 '%s%s\n' "${promptString@P}" "$2"
     }
 fi
 
@@ -271,7 +276,7 @@ if [ "$isTrailingPrompt" -a ${count:-0} -gt 0 ]; then
     adaptColumnsToFitLongComment
     prompt "${COMMENT-$count}" "$command"
 else
-    [ "$summarizeFailures" ] && printf >&2 '%s%s\n' "$summarizeFailedPrefix" "$summarizeFailures"
+    [ "$summarizeFailures" ] && printf >&4 '%s%s\n' "$summarizeFailedPrefix" "$summarizeFailures"
 fi
 
 exit $overallExitStatus

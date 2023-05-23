@@ -135,8 +135,10 @@ if [ ! "$isEmulatePrompt" -a ! "$PS1" ]; then
 	source PS1Setup
     elif callable PS1Setup; then
 	PS1Setup
+    elif [ -x ~/autosource/prompt_i.sh ]; then
+	source ~/autosource/prompt_i.sh
     fi
-    [ "$PS1" ] || isEmulatePrompt=t
+    [ -n "$PS1" ] || isEmulatePrompt=t
 fi
 
 

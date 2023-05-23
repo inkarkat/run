@@ -2,7 +2,7 @@
 
 printShortUsage()
 {
-    printf 'Usage: echo COMMANDLINES | [RUNWITHPROMPT_SINK=FILESPEC|&N] %q %s\n' "$(basename "$1")" '[--initial-status NUM] [--trailing-prompt|--no-trailing-prompt] [--no-output-no-prompt] [--no-output-no-error] [--no-success-no-count|--no-count-on N] [--exit-on-success|--exit-on-failure|--exit-on NUM] [--emulate-prompt] [--worst-status] [-c|--comment COMMENT] [--summarize-failed ERROR-TEXT [--summarize-failed-separator SEP]] [-?|-h|--help]'
+    printf 'Usage: echo COMMANDLINES | [RUNWITHPROMPT_SINK=FILESPEC|&N] %q %s\n' "$(basename "$1")" '[--initial-status NUM] [--trailing-prompt|--no-trailing-prompt] [--no-output-no-prompt] [--no-output-no-error] [--no-success-no-count|--no-count-on N] [--exit-on-success|--exit-on-failure|--exit-on NUM] [--emulate-prompt] [--worst-status] [-C|--comment COMMENT] [--summarize-failed ERROR-TEXT [--summarize-failed-separator SEP]] [-?|-h|--help]'
     echo
     printf 'Usage: %q %s <<EOF\n  COMMANDS\nEOF\n' "$(basename "$1")" '[...]'
 }
@@ -65,7 +65,7 @@ HELPDESCRIPTION
 			the rendering of PS1.
     --worst-status	Return the highest exit status of all COMMANDS instead
 			of the exit status of the last COMMAND.
-    --comment|-c COMMENT
+    --comment|-C COMMENT
 			Use / replace \! in PS1 with COMMENT instead of the
 			default counter of executed COMMANDS.
 			You can also update this within COMMANDS by setting the
@@ -115,7 +115,7 @@ do
 	--exit-unless)		shift; exitOn="$1"; shift; exitComparison=-ne;;
 	--emulate-prompt)	shift; isEmulatePrompt=t;;
 	--worst-status)		shift; isWorstStatus=t;;
-	--comment|-c)		shift; COMMENT="$1"; shift;;
+	--comment|-C)		shift; COMMENT="$1"; shift;;
 	--summarize-failed)	shift; isSummarizeFailed=t; summarizeFailedPrefix="$1"; shift;;
 	--summarize-failed-separator)	shift; summarizeFailedSeparator="$1"; shift;;
 	--)		shift; break;;

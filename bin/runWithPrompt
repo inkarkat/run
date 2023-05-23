@@ -5,6 +5,8 @@ printShortUsage()
     printf 'Usage: echo COMMANDLINES | [RUNWITHPROMPT_SINK=FILESPEC|&N] %q %s\n' "$(basename "$1")" '[--initial-status NUM] [--trailing-prompt|--no-trailing-prompt] [--no-output-no-prompt] [--no-output-no-error] [--no-success-no-count|--no-count-on N] [--exit-on-success|--exit-on-failure|--exit-on NUM] [--emulate-prompt] [--worst-status] [-C|--comment COMMENT] [--summarize-failed ERROR-TEXT [--summarize-failed-separator SEP]] [-?|-h|--help]'
     echo
     printf 'Usage: %q %s <<EOF\n  COMMANDS\nEOF\n' "$(basename "$1")" '[...]'
+    echo
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[...] -c|--command COMMANDLINE [-c ...]'
 }
 printUsage()
 {
@@ -98,6 +100,7 @@ isWorstStatus=
 isSummarizeFailed=
 summarizeFailedSeparator=' '
 summarizeFailedPrefix=
+typeset -a commands=()
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -118,6 +121,7 @@ do
 	--comment|-C)		shift; COMMENT="$1"; shift;;
 	--summarize-failed)	shift; isSummarizeFailed=t; summarizeFailedPrefix="$1"; shift;;
 	--summarize-failed-separator)	shift; summarizeFailedSeparator="$1"; shift;;
+	--command|-c)	shift; commands+=("${1?}"); shift;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
@@ -274,12 +278,22 @@ commandsFromStdin()
 	commandWithPrompt "$command"
     done
 }
+commandsFromArgs()
+{
+    for command in "${commands[@]}"
+    do
+	commandWithPrompt "$command"
+    done
+}
 
 count=
 overallExitStatus=0
 summarizeFailures=
 
-commandsFromStdin
+[ ${#commands[@]} -eq 0 ] \
+    && commandsFromStdin \
+    || commandsFromArgs
+
 if [ "$isTrailingPrompt" -a ${count:-0} -gt 0 ]; then
     [ "$summarizeFailures" ] && command="# ${summarizeFailedPrefix}$summarizeFailures"
 

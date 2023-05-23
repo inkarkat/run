@@ -258,23 +258,28 @@ commandWithPrompt()
     fi
 }
 
+commandsFromStdin()
+{
+    # Prevent that read command(s) consume following commands by reading from
+    # stdin. Instead, redirect stdin directly from the terminal (if available),
+    # or the null device. Note: For some commands, you can also directly
+    # influence their behavior; e.g. ssh -n.
+    exec 3<&0
+    # Force reading directly from terminal / null device if stdin is redirected,
+    # to avoid consuming input.
+    { exec 0</dev/tty; } 2>/dev/null || exec </dev/null
+
+    while IFS=$'\n' <&3 read -r command || [ -n "$command" ]
+    do
+	commandWithPrompt "$command"
+    done
+}
+
 count=
 overallExitStatus=0
 summarizeFailures=
 
-# Prevent that read command(s) consume following commands by reading from stdin.
-# Instead, redirect stdin directly from the terminal (if available), or the null
-# device. Note: For some commands, you can also directly influence their
-# behavior; e.g. ssh -n.
-exec 3<&0
-# Force reading directly from terminal / null device if stdin is redirected,
-# to avoid consuming input.
-{ exec 0</dev/tty; } 2>/dev/null || exec </dev/null
-
-while IFS=$'\n' <&3 read -r command || [ -n "$command" ]
-do
-    commandWithPrompt "$command"
-done
+commandsFromStdin
 if [ "$isTrailingPrompt" -a ${count:-0} -gt 0 ]; then
     [ "$summarizeFailures" ] && command="# ${summarizeFailedPrefix}$summarizeFailures"
 

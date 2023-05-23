@@ -166,6 +166,7 @@ if [ "$isEmulatePrompt" ]; then
     {
 	local comment="${1?}"; shift
 	local command="${1?}"; shift
+	local isFinal="$1"; shift
 
 	if [ $exitStatus -eq 0 ]; then
 	    exitStatusIndicator=; exitColor=$COLOR_RUNWITHPROMPT_SUCCESS
@@ -176,19 +177,22 @@ if [ "$isEmulatePrompt" ]; then
 	[ $exitStatus -eq 0 ] && eval "${RUNWITHPROMPT_SUCCESS_COMMAND:-}"
 	[ $exitStatus -ne 0 ] && eval "${RUNWITHPROMPT_FAIL_COMMAND:-}"
 
-	timestamp=$(timestamp)
-	printf >&4 "%s%-$((${COLUMNS:-80} - ${#timestamp} - 10))s %s %s %s\n$ %s\n" "$exitColor" "$exitStatusIndicator" "$timestamp" "${comment:+!}${comment:-  }" "$COLOR_RESET" "$command"
+	local timestamp="$(timestamp)"
+	local promptSigil='\n$ '; [ "$isFinal" ] && promptSigil=''
+	printf >&4 "%s%-$((${COLUMNS:-80} - ${#timestamp} - 10))s %s %s %s${promptSigil}%s\\n" "$exitColor" "$exitStatusIndicator" "$timestamp" "${comment:+!}${comment:-  }" "$COLOR_RESET" "$command"
     }
 else
     prompt()
     {
 	local comment="${1?}"; shift
 	local command="${1?}"; shift
+	local isFinal="$1"; shift
 
 	[ $exitStatus -eq 0 ] && eval "${RUNWITHPROMPT_SUCCESS_COMMAND:-}"
 	[ $exitStatus -ne 0 ] && eval "${RUNWITHPROMPT_FAIL_COMMAND:-}"
 
 	local promptString="${PS1//\\!/${comment:- }}"
+	[ "$isFinal" ] && promptString="${promptString%\\n\$ }"
 	[ $exitStatus -eq 0 ] || (exit $exitStatus)
 	printf >&4 '%s%s\n' "${promptString@P}" "$command"
     }
@@ -302,10 +306,10 @@ summarizeFailures=
     || commandsFromArgs
 
 if [ "$isTrailingPrompt" -a ${count:-0} -gt 0 ]; then
-    summary=; [ "$summarizeFailures" ] && summary="# ${summarizeFailedPrefix}$summarizeFailures"
+    summary=; [ "$summarizeFailures" ] && summary=$'\n'"# ${summarizeFailedPrefix}$summarizeFailures"
 
     adaptColumnsToFitLongComment
-    prompt "${COMMENT-$count}" "$summary"
+    prompt "${COMMENT-$count}" "$summary" t
 else
     [ "$summarizeFailures" ] && printf >&4 '%s%s\n' "$summarizeFailedPrefix" "$summarizeFailures"
 fi

@@ -1,0 +1,128 @@
+#!/bin/bash
+
+# Note that the setsid relinquishes the terminals's control of our process, so access to /dev/tty will fail with "/dev/tty: No such device or address" (though the device file still exists). So anything that is launched and requires interactivity needs to suppress the group leadership taking, by setting PGID=$$ script ... Cp. https://stackoverflow.com/questions/30692575/how-can-i-recover-the-controlling-tty-after-a-setsid
+if [ -z "$PGID" ]; then # No parent script has become the process group leader yet.
+    pgid=$(($(ps -o pgid= -p "$$")))	# By defining this, we'll be killing subshell processes of this process group when we're done or interrupted. Any children with the same ambition will defer to us.
+    if [ $$ -eq $pgid ]; then
+	export PGID=$pgid   # We are (already / after setsid) in our own process group, announce our leadership to any children, so that they don't become leaders themselves and thereby decouple themselves from our lifetime control.
+    else
+	exec setsid --wait "${BASH_SOURCE[0]}" "$@" # Use setsid instead of set -m (...) to avoid having another subshell in between.
+    fi
+fi
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-k|--keep-prompt] [-t|--timeout|--for TIMEOUT] [-p|--prompt PROMPT] ... [-?|-h|--help]'
+    echo
+    printf 'Usage: %q %s\n' "$(basename "$1")" '... -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...]'
+    echo
+    printf 'Usage: echo COMMANDLINES | %q %s\n' "$(basename "$1")" '... [--bare|[--trailing-prompt|--no-trailing-prompt] [--emulate-prompt] [--worst-status]]'
+    echo
+    printf 'Usage: %q %s <<EOF\n  COMMANDLINE\n...\nEOF\n' "$(basename "$1")" '...'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Execute COMMAND. If the command did not invoke the pager during its runtime, the
+user will be prompted for confirmation at the end before the wrapper itself
+concludes (to keep a terminal window or remote session open until the user
+acknowledges the COMMAND's execution).
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --bare		Do not print a status line before and after launching
+			the COMMAND.
+    --trailing-prompt	Customizations of the prompt emulation around COMMAND;
+    --no-trailing-prompt cp. runWithPrompt
+    --emulate-prompt
+    --worst-status
+    --keep-prompt|-k	Keep the prompt on the screen instead of clearing it
+			after it has been acknowledged / after the timeout.
+    --timeout|-t|--for SECONDS
+			Wait only for SECONDS instead of indefinitely, then
+			return 123.
+    --prompt|-p	PROMPT	Use PROMPT instead of the default "Press any key to
+			continue..."
+HELPTEXT
+}
+
+isBare=
+isNeedEval=
+typeset -a commands=()
+typeset -a runWithPromptArgs=()
+typeset -a userpromptArgs=()
+typeset -a userpromptPrompt=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--command|-c)	shift; commands+=(${commands:+;} "$1"); isNeedEval=t; shift;;
+	--bare)		shift; isBare=t;;
+	--no-trailing-prompt|--trailing-prompt|--emulate-prompt|--worst-status)
+			runWithPromptArgs+=("$1"); shift;;
+	--keep-prompt|-k)
+			userpromptArgs+=("$1"); shift;;
+	--timeout|--for|-t)
+			userpromptArgs+=("$1" "${2?}"); shift; shift;;
+	--prompt|-p)	shift; userpromptPrompt+=(-- "${1?}"); shift; shift;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+
+optionalPrompt()
+{
+    userprompt "${userpromptArgs[@]}" "${userpromptPrompt[@]}"
+}
+trap 'optionalPrompt' EXIT
+trap 'trap - EXIT' SIGUSR1
+pagerWatcher()
+{
+    while :
+    do
+	if pgrep --pgroup ${PGID:?} --exact "${PAGER}${PAGER:+|}less" --count >/dev/null; then
+####D echo >&2 "**** pager detected"
+	    kill -SIGUSR1 $$
+	    break
+	fi
+	sleep .5
+    done
+}
+pagerWatcher </dev/null &
+
+if [ $# -ne 0 ]; then
+    if [ "$isNeedEval" ]; then
+	# Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
+	# undo the effects of eval.
+	printf -v quotedSimpleCommand '%q ' "$@"
+	commands+=(${commands:+;} "${quotedSimpleCommand% }")
+    else
+	commands=("$@")
+    fi
+fi
+if [ ${#commands[@]} -eq 0 ]; then
+    if [ "$isBare" ]; then
+	bash -
+    else
+	runWithPrompt "${runWithPromptArgs[@]}"
+    fi
+elif [ "$isNeedEval" ]; then
+    eval "${commands[@]}"
+else
+    "${commands[@]}"
+fi
+kill %-

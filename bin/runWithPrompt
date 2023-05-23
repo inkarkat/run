@@ -257,8 +257,7 @@ commandWithPrompt()
     fi
 
     if [ "$exitOn" ] && [ $commandExitStatus $exitComparison $exitOn ]; then
-	command=''  # Don't repeat the last command in the trailing prompt; the loop would regularly end with an empty command, too.
-	break
+	return 1
     fi
 }
 
@@ -275,14 +274,14 @@ commandsFromStdin()
 
     while IFS=$'\n' <&3 read -r command || [ -n "$command" ]
     do
-	commandWithPrompt "$command"
+	commandWithPrompt "$command" || break
     done
 }
 commandsFromArgs()
 {
     for command in "${commands[@]}"
     do
-	commandWithPrompt "$command"
+	commandWithPrompt "$command" || break
     done
 }
 
@@ -295,10 +294,10 @@ summarizeFailures=
     || commandsFromArgs
 
 if [ "$isTrailingPrompt" -a ${count:-0} -gt 0 ]; then
-    [ "$summarizeFailures" ] && command="# ${summarizeFailedPrefix}$summarizeFailures"
+    summary=; [ "$summarizeFailures" ] && summary="# ${summarizeFailedPrefix}$summarizeFailures"
 
     adaptColumnsToFitLongComment
-    prompt "${COMMENT-$count}" "$command"
+    prompt "${COMMENT-$count}" "$summary"
 else
     [ "$summarizeFailures" ] && printf >&4 '%s%s\n' "$summarizeFailedPrefix" "$summarizeFailures"
 fi

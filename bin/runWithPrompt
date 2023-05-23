@@ -193,21 +193,9 @@ adaptColumnsToFitLongComment()
     fi
 }
 
-count=
-overallExitStatus=0
-summarizeFailures=
-
-# Prevent that read command(s) consume following commands by reading from stdin.
-# Instead, redirect stdin directly from the terminal (if available), or the null
-# device. Note: For some commands, you can also directly influence their
-# behavior; e.g. ssh -n.
-exec 3<&0
-# Force reading directly from terminal / null device if stdin is redirected,
-# to avoid consuming input.
-{ exec 0</dev/tty; } 2>/dev/null || exec </dev/null
-
-while IFS=$'\n' <&3 read -r command || [ -n "$command" ]
-do
+commandWithPrompt()
+{
+    local command="${1:?}"; shift
     if  [[ "$command" =~ ^[[:space:]]*(COMMENT|COMMAND)=\"[^\"]*\"[[:space:]]*$ ]] || \
 	[[ "$command" =~ ^[[:space:]]*(COMMENT|COMMAND)=\'[^\']*\'[[:space:]]*$ ]] || \
 	[[ "$command" =~ ^[[:space:]]*(COMMENT|COMMAND)=[^\'\"\;\&\|]*[[:space:]]*$ ]]; then
@@ -218,8 +206,7 @@ do
     fi
 
     if [ "$isNoOutputNoPrompt" ] || [ "$isNoOutputNoError" ]; then
-	hasOutput=
-	buffer=
+	local hasOutput= buffer=
 	eval "$command" $outputRedir | {
 	    while IFS=$'\n' read -r line || [ -n "$line" ]
 	    do
@@ -244,8 +231,8 @@ do
 	    [ "$hasOutput" ]
 	}
 	typeset -a ps=("${PIPESTATUS[@]}")
-	commandExitStatus=${ps[0]}
-	outputIndication=${ps[1]}
+	local commandExitStatus=${ps[0]}
+	local outputIndication=${ps[1]}
 	if [ -n "$isNoOutputNoError" -a $outputIndication -ne 0 ]; then
 	    # Suppress failure as there as no output (as the while pipeline
 	    # succeeded).
@@ -269,6 +256,24 @@ do
 	command=''  # Don't repeat the last command in the trailing prompt; the loop would regularly end with an empty command, too.
 	break
     fi
+}
+
+count=
+overallExitStatus=0
+summarizeFailures=
+
+# Prevent that read command(s) consume following commands by reading from stdin.
+# Instead, redirect stdin directly from the terminal (if available), or the null
+# device. Note: For some commands, you can also directly influence their
+# behavior; e.g. ssh -n.
+exec 3<&0
+# Force reading directly from terminal / null device if stdin is redirected,
+# to avoid consuming input.
+{ exec 0</dev/tty; } 2>/dev/null || exec </dev/null
+
+while IFS=$'\n' <&3 read -r command || [ -n "$command" ]
+do
+    commandWithPrompt "$command"
 done
 if [ "$isTrailingPrompt" -a ${count:-0} -gt 0 ]; then
     [ "$summarizeFailures" ] && command="# ${summarizeFailedPrefix}$summarizeFailures"

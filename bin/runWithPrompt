@@ -1,8 +1,12 @@
 #!/bin/bash
 
+getShortUsage()
+{
+    printf %s '[--initial-status NUM] [--trailing-prompt|--no-trailing-prompt] [--no-output-no-prompt] [--no-output-no-error] [--no-success-no-count|--no-count-on N] [--exit-on-success|--exit-on-failure|--exit-on NUM|--exit-unless NUM] [--emulate-prompt] [--worst-status] [-C|--comment COMMENT] [--summarize-failed ERROR-TEXT [--summarize-failed-separator SEP]]'
+}
 printShortUsage()
 {
-    printf 'Usage: echo COMMANDLINES | [RUNWITHPROMPT_SINK=FILESPEC|&N] %q %s\n' "$(basename "$1")" '[--initial-status NUM] [--trailing-prompt|--no-trailing-prompt] [--no-output-no-prompt] [--no-output-no-error] [--no-success-no-count|--no-count-on N] [--exit-on-success|--exit-on-failure|--exit-on NUM] [--emulate-prompt] [--worst-status] [-C|--comment COMMENT] [--summarize-failed ERROR-TEXT [--summarize-failed-separator SEP]] [-?|-h|--help]'
+    printf 'Usage: echo COMMANDLINES | [RUNWITHPROMPT_SINK=FILESPEC|&N] %q %s %s\n' "$(basename "$1")" "$(getShortUsage)" '[-?|-h|--help]'
     echo
     printf 'Usage: %q %s <<EOF\n  COMMANDS\nEOF\n' "$(basename "$1")" '[...]'
     echo
@@ -20,7 +24,8 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-Run the COMMANDS read from stdin, each surrounded by an (emulated) command prompt.
+Run the COMMANDS read from stdin, each surrounded by an (emulated) command
+prompt.
 You can modify the logged COMMAND (basically defining a shorter or nicer alias
 for what is actually executed) by setting the COMMAND=... variable. If you do
 this on a separate line with the form COMMAND='text' or COMMAND="text" or
@@ -30,6 +35,10 @@ HELPDESCRIPTION
     echo
     printShortUsage "$1"
     echo
+    getLongUsage
+}
+getLongUsage()
+{
     cat <<HELPTEXT
     --initial-status NUM
 			Indicate an exit status NUM in the very first prompt (as
@@ -105,6 +114,8 @@ while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--get-short-usage)	shift; getShortUsage; exit 0;;
+	--get-long-usage)	shift; getLongUsage; exit 0;;
 	--initial-status)	shift; exitStatus="$1"; shift;;
 	--trailing-prompt)	shift; isTrailingPrompt=t;;
 	--no-trailing-prompt)	shift; isTrailingPrompt=;;

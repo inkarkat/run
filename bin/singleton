@@ -89,7 +89,6 @@ timeout=0
 timeoutMessage=
 id=
 escapedId=
-isNeedEval=
 typeset -a commands=()
 while [ $# -ne 0 ]
 do
@@ -97,7 +96,7 @@ do
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--kill)		shift; [ -n "$action" ] && abortSingleAction "$0"; action=kill;;
 	--restart)	shift; [ -n "$action" ] && abortSingleAction "$0"; action=restart;;
-	--command|-c)	shift; commands+=(${commands:+;} "$1"); isNeedEval=t; shift;;
+	--command|-c)	shift; commands+=(${commands:+;} "$1"); shift;;
 	--quiet|-q)	shift; isQuiet=t;;
 	--verbose|-v)	shift; isVerbose=t;;
 	--block|-b)	shift; isBlock=t;;
@@ -119,14 +118,10 @@ do
     esac
 done
 if [ $# -ne 0 ]; then
-    if [ "$isNeedEval" ]; then
-	# Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
-	# undo the effects of eval.
-	printf -v quotedSimpleCommand '%q ' "$@"
-	commands+=(${commands:+;} "${quotedSimpleCommand% }")
-    else
-	commands=("$@")
-    fi
+    # Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
+    # undo the effects of eval.
+    printf -v quotedSimpleCommand '%q ' "$@"
+    commands+=(${commands:+;} "${quotedSimpleCommand% }")
 fi
 if [ "$action" = kill ]; then
     if [ -n "$id" -a ${#commands[@]} -gt 0 ]; then
@@ -174,14 +169,6 @@ checkin()
 	kill -- -$pgid # If we're the leader, kill subshell processes when the script exits.
     fi
 }
-execute()
-{
-    if [ "$isNeedEval" ]; then
-	eval "${commands[@]}"
-    else
-	"${commands[@]}"
-    fi
-}
 getLastRun()
 {
     transactionMarker --query "$escapedId" --get-time '' --get-diff '(%R)' | joinBy - ' '
@@ -225,7 +212,7 @@ tryExecute()
 	fi
 
 	trap "checkin" EXIT
-	execute
+	eval "${commands[@]}"
 	exit $?
     fi
     marker --end-transaction "$$"

@@ -10,6 +10,8 @@ if [ -z "$PGID" ]; then # No parent script has become the process group leader y
     fi
 fi
 
+: ${ENSUREPROMPTING_COMMAND_JOINER=;}
+
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
@@ -63,8 +65,8 @@ HELPTEXT
 }
 
 isBare=
-typeset -a commands=()
-typeset -a promptCommands=()
+commands=
+promptCommands=
 typeset -a bashArgs=()
 runWithCommand=runWithPrompt
 typeset -a runWithPromptArgs=()
@@ -75,9 +77,9 @@ while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
-	--command|-c)	shift; commands+=(${commands:+;} "$1"); shift;;
+	--command|-c)	shift; commands+="${commands:+ $ENSUREPROMPTING_COMMAND_JOINER }$1"; shift;;
 	--prompt-command|-P)
-			shift; promptCommands+=(${promptCommands:+;} "$1"); shift;;
+			shift; promptCommands+="${promptCommands:+ $ENSUREPROMPTING_COMMAND_JOINER }$1"; shift;;
 	--bare)		shift; isBare=t; runWithCommand=runWith;;
 	--exit-on-failure)
 			bashArgs+=(-e); runWithPromptArgs+=("$1"); shift;;
@@ -99,7 +101,7 @@ done
 
 optionalPrompt()
 {
-    eval "${promptCommands[@]}"
+    eval "$promptCommands"
     $userpromptCommand "${userpromptArgs[@]}" "${userpromptPrompt[@]}"
 }
 trap 'optionalPrompt' EXIT
@@ -122,15 +124,15 @@ if [ $# -ne 0 ]; then
     # Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
     # undo the effects of eval.
     printf -v quotedSimpleCommand '%q ' "$@"
-    commands+=(${commands:+;} "${quotedSimpleCommand% }")
+    commands+="${commands:+ $ENSUREPROMPTING_COMMAND_JOINER }${quotedSimpleCommand% }"
 fi
-if [ ${#commands[@]} -eq 0 ]; then
+if [ -z "$commands" ]; then
     if [ "$isBare" ] && [ ${#runWithPromptArgs[@]} -eq 0 -o "${#runWithPromptArgs[*]}" = --exit-on-failure ]; then
 	bash "${bashArgs[@]}" -
     else
 	${runWithCommand:?} "${runWithPromptArgs[@]}"
     fi
 else
-    eval "${commands[@]}"
+    eval "$commands"
 fi
 kill %-

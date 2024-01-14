@@ -93,7 +93,7 @@ case "$with" in
 	[ ${#runWithPromptArgs[@]} -eq 0 ] && runWithPromptArgs=(--worst-status)
 	for c in "${commands[@]}"
 	do
-	    if [[ "$c" =~ \{\} ]]; then
+	    if [[ "$c" =~ "$argMarker" ]]; then
 		printf -v quotedArgs '%q ' "$@"; quotedArgs="${quotedArgs% }"
 		printf '%s\n' "${c//"$argMarker"/$quotedArgs}"
 	    else

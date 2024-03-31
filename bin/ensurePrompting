@@ -92,7 +92,7 @@ do
 	--timeout|--for|-t)
 			userpromptArgs+=("$1" "${2?}"); shift; shift;;
 	--no-prompt)	shift; userpromptCommand=:;;
-	--prompt|-p)	shift; userpromptPrompt=(-- "${1?}"); shift; shift;;
+	--prompt|-p)	shift; userpromptPrompt=(-- "${1?}"); shift;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;

@@ -112,7 +112,7 @@ pagerWatcher()
     while :
     do
 	if pgrep --pgroup ${PGID:?} --exact "${PAGER}${PAGER:+|}less" --count >/dev/null; then
-####D echo >&2 "**** pager detected"
+	    case ",${DEBUG:-}," in *,ensurePrompting,*) echo >&2 "${PS4}ensurePrompting: pager detected";; esac
 	    kill -SIGUSR1 $$
 	    break
 	fi

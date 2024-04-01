@@ -4,8 +4,8 @@
 if [ -z "$PGID" ]; then # No parent script has become the process group leader yet.
     export USERQUERY_INPUT=/dev/stdin	# Need to use stdin for userprompt input, as the tty is no longer available (see above).
     pgid=$(($(ps -o pgid= -p "$$")))	# By defining this, we'll be killing subshell processes of this process group when we're done or interrupted. Any children with the same ambition will defer to us.
-    if [ $$ -eq $pgid ]; then
-	export PGID=$pgid   # We are (already / after setsid) in our own process group, announce our leadership to any children, so that they don't become leaders themselves and thereby decouple themselves from our lifetime control.
+    if [ $$ -eq $pgid ] || [[ $- != *m* ]]; then    # Second condition to avoid "bash: cannot set terminal process group (...): Inappropriate ioctl for device bash: no job control in this shell"
+	export PGID=$pgid   # We are (already / after setsid) in our own process group (or we don't have job control and a parent is the process group leader), announce our (their) leadership to any children, so that they don't become leaders themselves and thereby decouple themselves from our lifetime control.
     else
 	exec setsid --wait "${BASH_SOURCE[0]}" "$@" # Use setsid instead of set -m (...) to avoid having another subshell in between.
     fi

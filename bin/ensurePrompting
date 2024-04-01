@@ -136,4 +136,4 @@ if [ -z "$commands" ]; then
 else
     eval "$commands"
 fi
-kill %-
+kill %- 2>/dev/null

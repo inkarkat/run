@@ -2,6 +2,7 @@
 
 # Note that the setsid relinquishes the terminals's control of our process, so access to /dev/tty will fail with "/dev/tty: No such device or address" (though the device file still exists). So anything that is launched and requires interactivity needs to suppress the group leadership taking, by setting PGID=$$ script ... Cp. https://stackoverflow.com/questions/30692575/how-can-i-recover-the-controlling-tty-after-a-setsid
 if [ -z "$PGID" ]; then # No parent script has become the process group leader yet.
+    export USERQUERY_INPUT=/dev/stdin	# Need to use stdin for userprompt input, as the tty is no longer available (see above).
     pgid=$(($(ps -o pgid= -p "$$")))	# By defining this, we'll be killing subshell processes of this process group when we're done or interrupted. Any children with the same ambition will defer to us.
     if [ $$ -eq $pgid ]; then
 	export PGID=$pgid   # We are (already / after setsid) in our own process group, announce our leadership to any children, so that they don't become leaders themselves and thereby decouple themselves from our lifetime control.

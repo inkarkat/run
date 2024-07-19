@@ -54,8 +54,7 @@ HELPTEXT
     --keep-prompt|-k	Keep the prompt on the screen instead of clearing it
 			after it has been acknowledged / after the timeout.
     --timeout|-t|--for SECONDS
-			Wait only for SECONDS instead of indefinitely, then
-			return 123.
+			Wait only for SECONDS instead of indefinitely.
     --prompt|-p	PROMPT	Use PROMPT instead of the default "Press any key to
 			continue..."
     --no-prompt		Disables the default prompt (in favor of an explictly

@@ -224,7 +224,7 @@ fi
 originalColumns=${COLUMNS:=80}
 adaptColumnsToFitLongComment()
 {
-    [ "$COMMENT" ] || return
+    [ -n "$COMMENT" ] || return
     local commentLen=${#COMMENT}
     if [ $commentLen -gt 6 ]; then
 	local newColumns=$((originalColumns - commentLen + 6))
@@ -273,7 +273,7 @@ commandWithPrompt()
 	local commandExitStatus=${ps[0]}
 	local outputIndication=${ps[1]}
 	if [ -n "$isNoOutputNoError" -a $outputIndication -ne 0 ]; then
-	    # Suppress failure as there as no output (as the while pipeline
+	    # Suppress failure as there is no output (as the while pipeline
 	    # succeeded).
 	    exitStatus=0
 	else
@@ -282,7 +282,7 @@ commandWithPrompt()
     else
 	adaptColumnsToFitLongComment; prompt "${COMMENT-$count}" "${COMMAND-$command}"
 	eval "$command"
-	commandExitStatus=$?
+	local commandExitStatus=$?
 	exitStatus=$commandExitStatus
     fi
     [ -n "$isNoSuccessNoCount" -a $commandExitStatus -ne 0 ] || [ "$noCountOn" = "$commandExitStatus" ] || let count+=1

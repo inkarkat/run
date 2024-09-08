@@ -46,10 +46,15 @@ HELPDESCRIPTION
 			Use COMMENT instead of the default counter of executed
 			COMMANDS.
 			You can also update this within COMMANDS by setting the
-			COMMENT=... variable. If you do this on a separate line
-			with the form COMMENT='text' or COMMENT="text" or
-			COMMENT=text, the update will happen silently; i.e.
-			without printing that command-line.
+			COMMENT variable. If you do this on a separate line with
+			the form <space>COMMENT=..., the update will happen
+			silently; i.e. without counting that command-line.
+			This will affect all following commands; use
+			<space>unset COMMENT to revert to counting.
+			For a custom count, the COMMENT should be set _after_
+			the corresponding command, but in order to provide a
+			context for the following command, you can also set it
+			_before_.
     --summarize-failed ERROR-TEXT
 			For each failed line in COMMANDS, record the counter /
 			COMMENT and summarize those failures at the end as a
@@ -110,19 +115,18 @@ exec 3<&0
 
 while IFS=$'\n' <&3 read -r command || [ -n "$command" ]
 do
-    if  [[ "$command" =~ ^[[:space:]]*(COMMENT|COMMAND)=\"[^\"]*\"[[:space:]]*$ ]] || \
-	[[ "$command" =~ ^[[:space:]]*(COMMENT|COMMAND)=\'[^\']*\'[[:space:]]*$ ]] || \
-	[[ "$command" =~ ^[[:space:]]*(COMMENT|COMMAND)=[^\'\"\;\&\|]*[[:space:]]*$ ]]; then
-	# This command solely sets the COMMENT or COMMAND; don't log it, just
-	# silently execute it.
-	eval "$command"
-	continue
+    isSkipCounting=
+    if  [[ "$command" =~ ^\  ]]; then
+	# Hidden command (e.g. to set COMMENT): don't count it, just execute it.
+	isSkipCounting=t
     fi
 
     eval "$command"
     exitStatus=$?
-    [ -n "$isNoSuccessNoCount" -a $exitStatus -ne 0 ] || [ "$noCountOn" = "$exitStatus" ] || let count+=1
-    [ $exitStatus -eq 0 -o -z "$isSummarizeFailed" ] || summarizeFailures+="${summarizeFailures:+$summarizeFailedSeparator}${COMMENT-$count}"
+    [ "$isSkipCounting" ] || [ -n "$isNoSuccessNoCount" -a $exitStatus -ne 0 ] || [ "$noCountOn" = "$exitStatus" ] \
+	|| let count+=1
+    [ $exitStatus -eq 0 -o -z "$isSummarizeFailed" ] \
+	|| summarizeFailures+="${summarizeFailures:+$summarizeFailedSeparator}${COMMENT-$count}"
     if [ ! "$isWorstStatus" -o $exitStatus -gt $overallExitStatus ]; then
 	overallExitStatus=$exitStatus
     fi

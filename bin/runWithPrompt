@@ -36,12 +36,16 @@ printLongUsage()
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
 Run the COMMANDS read from stdin, each surrounded by an (emulated) command
-prompt.
+prompt (unless the command starts with a space (like with
+HISTCONTROL=ignorespace); then, it's executed silently, without printing (or
+counting) that command-line). Error handling still applies; add " || :" to
+ignore any failures of silent commands, and preferably execute them before the
+actual command, or save and restore \$exitStatus around them to keep the actual
+command's exit status.
 You can modify the logged COMMAND (basically defining a shorter or nicer alias
-for what is actually executed) by setting the COMMAND=... variable. If you do
-this on a separate line with the form COMMAND='text' or COMMAND="text" or
-COMMAND=text, the update will happen silently; i.e. without printing that
-command-line.
+for what is actually executed) by setting the COMMAND variable. If you do this
+on a separate line with the form <space>COMMAND=..., the update will happen
+silently; i.e. without printing that command-line.
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
@@ -91,10 +95,16 @@ getLongUsage()
 			Use / replace \! in PS1 with COMMENT instead of the
 			default counter of executed COMMANDS.
 			You can also update this within COMMANDS by setting the
-			COMMENT=... variable. If you do this on a separate line
-			with the form COMMENT='text' or COMMENT="text" or
-			COMMENT=text, the update will happen silently; i.e.
-			without printing that command-line.
+			COMMENT variable. If you do this on a separate line with
+			the form <space>COMMENT=..., the update will happen
+			silently; i.e. without printing that command-line.
+			This will affect all following commands; use
+			<space>unset COMMENT to revert to counting.
+			For a custom status, the COMMENT should be set _after_
+			the corresponding command, but in order to provide a
+			header-like context with a final summary at the end, you
+			can also set it _before_ the command, with the summary
+			last.
     --summarize-failed ERROR-TEXT
 			For each failed line in COMMANDS, record the counter /
 			COMMENT and summarize those failures at the end (as a
@@ -235,16 +245,15 @@ adaptColumnsToFitLongComment()
 commandWithPrompt()
 {
     local command="${1:?}"; shift
-    if  [[ "$command" =~ ^[[:space:]]*(COMMENT|COMMAND)=\"[^\"]*\"[[:space:]]*$ ]] || \
-	[[ "$command" =~ ^[[:space:]]*(COMMENT|COMMAND)=\'[^\']*\'[[:space:]]*$ ]] || \
-	[[ "$command" =~ ^[[:space:]]*(COMMENT|COMMAND)=[^\'\"\;\&\|]*[[:space:]]*$ ]]; then
-	# This command solely sets the COMMENT or COMMAND; don't log it, just
-	# silently execute it.
+    local isSkipCounting=
+    if  [[ "$command" =~ ^\  ]]; then
+	# Hidden command (e.g. to set COMMENT or COMMAND): don't log it, just silently
+	# execute it.
 	eval "$command"
-	continue
-    fi
-
-    if [ "$isNoOutputNoPrompt" ] || [ "$isNoOutputNoError" ]; then
+	local commandExitStatus=$?
+	exitStatus=$commandExitStatus
+	isSkipCounting=t
+    elif [ "$isNoOutputNoPrompt" ] || [ "$isNoOutputNoError" ]; then
 	local hasOutput= buffer=
 	eval "$command" $outputRedir | {
 	    while IFS=$'\n' read -r line || [ -n "$line" ]
@@ -285,8 +294,10 @@ commandWithPrompt()
 	local commandExitStatus=$?
 	exitStatus=$commandExitStatus
     fi
-    [ -n "$isNoSuccessNoCount" -a $commandExitStatus -ne 0 ] || [ "$noCountOn" = "$commandExitStatus" ] || let count+=1
-    [ $exitStatus -eq 0 -o -z "$isSummarizeFailed" ] || summarizeFailures+="${summarizeFailures:+$summarizeFailedSeparator}${COMMENT-$count}"
+    [ "$isSkipCounting" ] || [ -n "$isNoSuccessNoCount" -a $commandExitStatus -ne 0 ] || [ "$noCountOn" = "$commandExitStatus" ] \
+	|| let count+=1
+    [ $exitStatus -eq 0 -o -z "$isSummarizeFailed" ] \
+	|| summarizeFailures+="${summarizeFailures:+$summarizeFailedSeparator}${COMMENT-$count}"
     if [ ! "$isWorstStatus" -o $exitStatus -gt $overallExitStatus ]; then
 	overallExitStatus=$exitStatus
     fi

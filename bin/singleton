@@ -167,6 +167,7 @@ checkin()
     marker --transactional --update "$escapedId" --context 0
 
     if [ -n "$pgid" ]; then
+	trap '' SIGTERM	# Don't kill ourselves when we kill the process group; this would print "Terminated" and change the exit status to 143. We're about to exit, anyway.
 	kill -- -$pgid # If we're the leader, kill subshell processes when the script exits.
     fi
 }

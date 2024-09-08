@@ -181,9 +181,9 @@ fi
 : ${RUNWITHPROMPT_TIMESTAMP:=%d-%b-%Y %T}
 
 case "$RUNWITHPROMPT_SINK" in
-    '')		exec 4>&1;;
-    \&[0-9])	eval "exec 4>$RUNWITHPROMPT_SINK";;
-    ?*)		exec 4>>"$RUNWITHPROMPT_SINK";;
+    '')		exec 5>&1;;
+    \&[0-9])	eval "exec 5>$RUNWITHPROMPT_SINK";;
+    ?*)		exec 5>>"$RUNWITHPROMPT_SINK";;
 esac
 
 timestamp()
@@ -212,7 +212,7 @@ if [ "$isEmulatePrompt" ]; then
 
 	local timestamp="$(timestamp)"
 	local promptSigil='\n$ '; [ "$isFinal" ] && promptSigil=''
-	printf >&4 "%s%-$((${COLUMNS:-80} - ${#timestamp} - 10))s %s %s %s${promptSigil}%s\\n" "$exitColor" "$exitStatusIndicator" "$timestamp" "${comment:+!}${comment:-  }" "$COLOR_RESET" "$command"
+	printf >&5 "%s%-$((${COLUMNS:-80} - ${#timestamp} - 10))s %s %s %s${promptSigil}%s\\n" "$exitColor" "$exitStatusIndicator" "$timestamp" "${comment:+!}${comment:-  }" "$COLOR_RESET" "$command"
     }
 else
     prompt()
@@ -227,7 +227,7 @@ else
 	local promptString="${PS1//\\!/${comment:- }}"
 	[ "$isFinal" ] && promptString="${promptString%\\n\$ }"
 	[ $exitStatus -eq 0 ] || (exit $exitStatus)
-	printf >&4 '%s%s\n' "${promptString@P}" "$command"
+	printf >&5 '%s%s\n' "${promptString@P}" "$command"
     }
 fi
 
@@ -345,7 +345,7 @@ if [ "$isTrailingPrompt" -a ${count:-0} -gt 0 ]; then
     adaptColumnsToFitLongComment
     prompt "${COMMENT-$count}" "$summary" t
 else
-    [ "$summarizeFailures" ] && printf >&4 '%s%s\n' "$summarizeFailedPrefix" "$summarizeFailures"
+    [ "$summarizeFailures" ] && printf >&5 '%s%s\n' "$summarizeFailedPrefix" "$summarizeFailures"
 fi
 
 exit $overallExitStatus

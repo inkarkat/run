@@ -112,10 +112,9 @@ case "$with" in
 	    [ ! "$isHeader" ] || header ${isFirst:+--first} "$c"
 
 	    printf -v quotedArgs '%q ' "$@"; quotedArgs="${quotedArgs% }"
-	    typeset -a a=("$@")
 	    interpolatedCommand="${c//"$argMarker"/$quotedArgs}"
-	    [ "$interpolatedCommand" = "$c" ] || a=()
-	    eval "$interpolatedCommand" '"${a[@]}"' || { exitStatus=$?; if [ $exitStatus -gt $status ]; then status=$exitStatus; fi; }
+	    [ "$interpolatedCommand" = "$c" ] || quotedArgs=''
+	    eval "$interpolatedCommand" "$quotedArgs" || { exitStatus=$?; if [ $exitStatus -gt $status ]; then status=$exitStatus; fi; }
 	    isFirst=
 	done
 	exit $status

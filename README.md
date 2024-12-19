@@ -7,7 +7,7 @@ _Commands to run other shell command[-line]s in special ways._
 * Bash, GNU `sed`
 * [inkarkat/executionMarker](https://github.com/inkarkat/executionMarker) for the `singleton` command
 * [inkarkat/headers](https://github.com/inkarkat/headers) for the `runAll` and `runWithPrompt` commands
-* automated testing is done with _bats - Bash Automated Testing System_ (https://github.com/bats-core/bats-core)
+* [inkarkat/miniDB](https://github.com/inkarkat/miniDB) for the `ensurePrompting` command
 
 ### Installation
 

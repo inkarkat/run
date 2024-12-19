@@ -112,7 +112,7 @@ do
 			esac
 			shift
 			;;
-	--id|-i)	shift; id="$1"; shift;;
+	--id|-i)	shift; id="${1:?}"; shift;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
@@ -140,7 +140,7 @@ elif [ -z "$commands" ]; then
 	echo >&2 'ERROR: No COMMAND(s) specified; need to pass -c|--command "COMMANDLINE", or SIMPLECOMMAND.'
 	exit 2
 fi
-[ -n "$id" ] || id="$commands"    # Generate ID from passed COMMAND(s).
+: ${id:=$commands}    # Generate ID from passed COMMAND(s) if not given.
 escapedId="${id//	/ }"
 singletonId=$$
 [ -n "$isBlock" -a -z "$timeoutMessage" ] && timeoutMessage='; waiting indefinitely'

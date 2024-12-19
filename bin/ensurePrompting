@@ -11,13 +11,14 @@ if [ -z "$PGID" ]; then # No parent script has become the process group leader y
     fi
 fi
 
+: ${ENSUREPROMPTING_PAGERWATCHER_THRESHOLD:=10}	# Number of consecutive COMMAND / ID observations with a pager before we assume that it always uses a pager; use -1 to disable. After one invocation that required external prompting, we'll always monitor ourselves.
 : ${ENSUREPROMPTING_COMMAND_JOINER=;}
 
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-k|--keep-prompt] [-t|--timeout|--for TIMEOUT] [--no-prompt|-p|--prompt PROMPT] [-P|--prompt-command PROMPT-COMMANDLINE [-P ...]] ... [-?|-h|--help]'
+    printf 'Usage: [ENSUREPROMPTING_PAGERWATCHER_THRESHOLD=N|-1] %q %s\n' "$(basename "$1")" '[-k|--keep-prompt] [-t|--timeout|--for TIMEOUT] [--no-prompt|-p|--prompt PROMPT] [-P|--prompt-command PROMPT-COMMANDLINE [-P ...]] [-i|--id ID] ... [-?|-h|--help]'
     echo
     printf 'Usage: %q %s\n' "$(basename "$1")" '... -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...]'
     echo
@@ -61,6 +62,9 @@ HELPTEXT
 			passed PROMPT-COMMANDLINE).
     --prompt-command|-P PROMPT-COMMANDLINE
 			Execute PROMPT-COMMANDLINE when prompting.
+    --id|-i ID		Identifier for the running COMMAND, to record the
+			behavior with regard to use of a pager. If omitted, will
+			use COMMAND itself.
 HELPTEXT
 }
 
@@ -73,6 +77,7 @@ typeset -a runWithPromptArgs=()
 userpromptCommand=userprompt
 typeset -a userpromptArgs=()
 typeset -a userpromptPrompt=()
+id=
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -93,11 +98,46 @@ do
 			userpromptArgs+=("$1" "${2?}"); shift; shift;;
 	--no-prompt)	shift; userpromptCommand=:;;
 	--prompt|-p)	shift; userpromptPrompt=(-- "${1?}"); shift;;
+	--id|-i)	shift; id="${1:?}"; shift;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
     esac
 done
+if [ $# -ne 0 ]; then
+    # Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
+    # undo the effects of eval.
+    printf -v quotedSimpleCommand '%q ' "$@"
+    commands+="${commands:+ $ENSUREPROMPTING_COMMAND_JOINER }${quotedSimpleCommand% }"
+fi
+: ${id:=$commands}    # Generate ID from passed COMMAND(s) if not given.
+escapedId="${id//	/ }"
+
+marker()
+{
+    executionMarker --base-type cache --group ensurePrompting "$@"
+}
+updateMarker()
+{
+    [ -n "$escapedId" -a $ENSUREPROMPTING_PAGERWATCHER_THRESHOLD -ge 0 ] || return 0
+    marker --update "$escapedId" "$@"
+}
+recordPagerUse()
+{
+    updateMarker --increment-context
+}
+recordPromptingRequired()
+{
+    updateMarker --context X	# Increment only supports positive integers; a non-numeric value won't ever be incremented.
+}
+isPagerPreviouslyUsedConsistently()
+{
+    [ -n "$escapedId" -a $ENSUREPROMPTING_PAGERWATCHER_THRESHOLD -ge 0 ] || return 1
+    local pagerUseCount; pagerUseCount=$(marker --query "$escapedId" --get-context) \
+	&& [[ "$pagerUseCount" =~ ^[0-9]+$ ]] \
+	&& [ $pagerUseCount -ge $ENSUREPROMPTING_PAGERWATCHER_THRESHOLD ]
+}
+
 
 optionalPrompt()
 {
@@ -105,8 +145,7 @@ optionalPrompt()
     $userpromptCommand "${userpromptArgs[@]}" "${userpromptPrompt[@]}"
     exit $status
 }
-trap 'optionalPrompt' EXIT
-trap 'trap - EXIT' SIGUSR1
+
 pagerWatcher()
 {
     while :
@@ -119,14 +158,21 @@ pagerWatcher()
 	sleep .5
     done
 }
-pagerWatcher </dev/null &
 
-if [ $# -ne 0 ]; then
-    # Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
-    # undo the effects of eval.
-    printf -v quotedSimpleCommand '%q ' "$@"
-    commands+="${commands:+ $ENSUREPROMPTING_COMMAND_JOINER }${quotedSimpleCommand% }"
+if isPagerPreviouslyUsedConsistently; then
+    case ",${DEBUG:-}," in *,ensurePrompting,*) echo >&2 "${PS4}ensurePrompting: according to our records, the command $id always uses a pager";; esac
+    cleanup() { :; }
+else
+    trap 'recordPromptingRequired; optionalPrompt' EXIT
+    trap 'trap - EXIT; recordPagerUse' SIGUSR1
+    pagerWatcher </dev/null &
+    cleanup()
+    {
+	kill %- 2>/dev/null
+    }
 fi
+
+
 if [ -z "$commands" ]; then
     if [ "$isBare" ] && [ ${#runWithPromptArgs[@]} -eq 0 -o "${#runWithPromptArgs[*]}" = --exit-on-failure ]; then
 	bash "${bashArgs[@]}" -
@@ -137,5 +183,5 @@ else
     eval "$commands"
 fi
 status=$?
-kill %- 2>/dev/null
+cleanup
 exit $status

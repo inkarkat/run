@@ -115,7 +115,7 @@ escapedId="${id//	/ }"
 
 marker()
 {
-    executionMarker --base-type cache --group ensurePrompting "$@"
+    miniDB --base-type cache --schema 'ID PAGER-USE-COUNT' --table ensurePrompting "$@"
 }
 updateMarker()
 {
@@ -124,16 +124,16 @@ updateMarker()
 }
 recordPagerUse()
 {
-    updateMarker --increment-context
+    updateMarker --column PAGER-USE-COUNT++
 }
 recordPromptingRequired()
 {
-    updateMarker --context X	# Increment only supports positive integers; a non-numeric value won't ever be incremented.
+    updateMarker --column PAGER-USE-COUNT=X	# Increment only supports positive integers; a non-numeric value won't ever be incremented.
 }
 isPagerPreviouslyUsedConsistently()
 {
     [ -n "$escapedId" -a $ENSUREPROMPTING_PAGERWATCHER_THRESHOLD -ge 0 ] || return 1
-    local pagerUseCount; pagerUseCount=$(marker --query "$escapedId" --get-context) \
+    local pagerUseCount; pagerUseCount=$(marker --query "$escapedId" --columns PAGER-USE-COUNT) \
 	&& [[ "$pagerUseCount" =~ ^[0-9]+$ ]] \
 	&& [ $pagerUseCount -ge $ENSUREPROMPTING_PAGERWATCHER_THRESHOLD ]
 }

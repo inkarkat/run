@@ -1,4 +1,5 @@
 #!/bin/bash
+shopt -qs extglob
 
 # Note that the setsid relinquishes the terminals's control of our process, so access to /dev/tty will fail with "/dev/tty: No such device or address" (though the device file still exists). So anything that is launched and requires interactivity needs to suppress the group leadership taking, by setting PGID=$$ script ... Cp. https://stackoverflow.com/questions/30692575/how-can-i-recover-the-controlling-tty-after-a-setsid
 if [ -z "$PGID" ]; then # No parent script has become the process group leader yet.
@@ -12,7 +13,22 @@ if [ -z "$PGID" ]; then # No parent script has become the process group leader y
 fi
 
 : ${ENSUREPROMPTING_PAGERWATCHER_THRESHOLD:=10}	# Number of consecutive COMMAND / ID observations with a pager before we assume that it always uses a pager; use -1 to disable. After one invocation that required external prompting, we'll always monitor ourselves.
+: ${ENSUREPROMPTING_LONGRUNNER_DURATION:=30m} # Duration a COMMAND / ID needs to run so that it's deemed an interactive program that doesn't require prompting as the user will quit it on its own.
+: ${ENSUREPROMPTING_LONGRUNNER_PERCENTAGE=90} # Ratio of COMMAND / ID runs that exceed the $ENSUREPROMPTING_LONGRUNNER_DURATION vs. total runs to determine that it's an interactive program that doesn't require prompting as the user will quit it on its own.
+: ${ENSUREPROMPTING_LONGRUNNER_THRESHOLD=10} # Number of total COMMAND / ID runs before evaluating whether it's an interactive program (when $ENSUREPROMPTING_LONGRUNNER_PERCENTAGE is met or exceeded) that doesn't require prompting as the user will quit it on its own; use -1 to disable.
 : ${ENSUREPROMPTING_COMMAND_JOINER=;}
+
+case "$ENSUREPROMPTING_LONGRUNNER_DURATION" in
+    +([0-9])?(s))   longRunnerDurationInSeconds="${ENSUREPROMPTING_LONGRUNNER_DURATION%s}";;
+    +([0-9])m)	    longRunnerDurationInSeconds=$((${ENSUREPROMPTING_LONGRUNNER_DURATION%m} * 60));;
+    +([0-9])h)	    longRunnerDurationInSeconds=$((${ENSUREPROMPTING_LONGRUNNER_DURATION%h} * 3600));;
+    +([0-9])d)	    longRunnerDurationInSeconds=$((${ENSUREPROMPTING_LONGRUNNER_DURATION%d} * 86400));;
+    +([0-9])w)	    longRunnerDurationInSeconds=$((${ENSUREPROMPTING_LONGRUNNER_DURATION%w} * 86400 * 7));;
+    +([0-9])mo)	    longRunnerDurationInSeconds=$((${ENSUREPROMPTING_LONGRUNNER_DURATION%mo} * 86400 * 30));;
+    +([0-9])y)	    longRunnerDurationInSeconds=$((${ENSUREPROMPTING_LONGRUNNER_DURATION%y} * 86400 * 365));;
+    +([0-9])g)	    longRunnerDurationInSeconds=$((${ENSUREPROMPTING_LONGRUNNER_DURATION%g} * 86400 * 9131));;
+    *)		    printf >&2 "ERROR: Illegal duration: %s\\n" "$ENSUREPROMPTING_LONGRUNNER_DURATION"; exit 2;;
+esac
 
 printShortUsage()
 {
@@ -113,31 +129,66 @@ fi
 : ${id:=$commands}    # Generate ID from passed COMMAND(s) if not given.
 escapedId="${id//	/ }"
 
+isCount()
+{
+    [[ "${1?}" =~ ^[0-9]+$ ]]
+}
+
 marker()
 {
-    miniDB --base-type cache --schema 'ID PAGER-USE-COUNT' --table ensurePrompting "$@"
+    miniDB --base-type cache --schema 'ID PAGER_USE_COUNT SHORTRUNNER_COUNT LONGRUNNER_COUNT' --table ensurePrompting "$@"
 }
 updateMarker()
 {
-    [ -n "$escapedId" -a $ENSUREPROMPTING_PAGERWATCHER_THRESHOLD -ge 0 ] || return 0
-    marker --update "$escapedId" "$@"
-}
-recordPagerUse()
-{
-    updateMarker --column PAGER-USE-COUNT++
-}
-recordPromptingRequired()
-{
-    updateMarker --column PAGER-USE-COUNT=X	# Increment only supports positive integers; a non-numeric value won't ever be incremented.
-}
-isPagerPreviouslyUsedConsistently()
-{
-    [ -n "$escapedId" -a $ENSUREPROMPTING_PAGERWATCHER_THRESHOLD -ge 0 ] || return 1
-    local pagerUseCount; pagerUseCount=$(marker --query "$escapedId" --columns PAGER-USE-COUNT) \
-	&& [[ "$pagerUseCount" =~ ^[0-9]+$ ]] \
-	&& [ $pagerUseCount -ge $ENSUREPROMPTING_PAGERWATCHER_THRESHOLD ]
-}
+    [ -n "$escapedId" ] || return 0
 
+    typeset -a columnUpdateArgs=()
+    [ $ENSUREPROMPTING_PAGERWATCHER_THRESHOLD -lt 0 ] \
+	|| columnUpdateArgs+=("$@")
+    if [ $ENSUREPROMPTING_LONGRUNNER_THRESHOLD -ge 0 ]; then
+	[ $SECONDS -ge $longRunnerDurationInSeconds ] \
+	    && columnUpdateArgs+=(--column LONGRUNNER_COUNT++) \
+	    || columnUpdateArgs+=(--column SHORTRUNNER_COUNT++)
+    fi
+
+    [ ${#columnUpdateArgs[@]} -gt 0 ] || return 0
+    marker --update "$escapedId" "${columnUpdateArgs[@]}"
+}
+recordDurationAndPagerUse()
+{
+    updateMarker --column PAGER_USE_COUNT++
+}
+recordDurationAndPromptingRequired()
+{
+    updateMarker --column PAGER_USE_COUNT=X	# Increment only supports positive integers; a non-numeric value won't ever be incremented.
+}
+isPagerPreviouslyUsedConsistentlyOrConfirmedLongRunner()
+{
+    [ -n "$escapedId" ] && [ $ENSUREPROMPTING_PAGERWATCHER_THRESHOLD -ge 0 -o $ENSUREPROMPTING_LONGRUNNER_THRESHOLD -ge 0 ] || return 1
+
+    local queryVariables; queryVariables=$(marker --query "$escapedId" --columns \* --as-shell-variables) || return 1
+    eval "$queryVariables"
+
+    if [ $ENSUREPROMPTING_PAGERWATCHER_THRESHOLD -ge 0 ] \
+	&& isCount "$PAGER_USE_COUNT" \
+	&& [ $PAGER_USE_COUNT -ge $ENSUREPROMPTING_PAGERWATCHER_THRESHOLD ]
+    then
+	case ",${DEBUG:-}," in *,ensurePrompting,*) echo >&2 "${PS4}ensurePrompting: according to our records, the command $id always uses a pager";; esac
+	return 0
+    fi
+
+    if [ $ENSUREPROMPTING_LONGRUNNER_THRESHOLD -ge 0 ] \
+	&& local total=$((${LONGRUNNER_COUNT:-0} + ${SHORTRUNNER_COUNT:-0})) \
+	&& [ $total -gt 0 ] \
+	&& local percentage=$((100 * ${LONGRUNNER_COUNT:-0} / total)) \
+	&& ((percentage >= ENSUREPROMPTING_LONGRUNNER_PERCENTAGE))
+    then
+	case ",${DEBUG:-}," in *,ensurePrompting,*) echo >&2 "${PS4}ensurePrompting: according to our records, the command $id is ${percentage}% long-running";; esac
+	return 0
+    fi
+
+    return 1
+}
 
 optionalPrompt()
 {
@@ -159,12 +210,11 @@ pagerWatcher()
     done
 }
 
-if isPagerPreviouslyUsedConsistently; then
-    case ",${DEBUG:-}," in *,ensurePrompting,*) echo >&2 "${PS4}ensurePrompting: according to our records, the command $id always uses a pager";; esac
+if isPagerPreviouslyUsedConsistentlyOrConfirmedLongRunner; then
     cleanup() { :; }
 else
-    trap 'recordPromptingRequired; optionalPrompt' EXIT
-    trap 'trap - EXIT; recordPagerUse' SIGUSR1
+    trap 'recordDurationAndPromptingRequired; optionalPrompt' EXIT
+    trap 'trap - EXIT; recordDurationAndPagerUse' SIGUSR1
     pagerWatcher </dev/null &
     cleanup()
     {
@@ -173,6 +223,7 @@ else
 fi
 
 
+SECONDS=0
 if [ -z "$commands" ]; then
     if [ "$isBare" ] && [ ${#runWithPromptArgs[@]} -eq 0 -o "${#runWithPromptArgs[*]}" = --exit-on-failure ]; then
 	bash "${bashArgs[@]}" -

@@ -244,9 +244,11 @@ adaptColumnsToFitLongComment()
 
 commandWithPrompt()
 {
-    local command="${1:?}"; shift
+    local command="${1?}"; shift
     local isSkipCounting=
-    if  [[ "$command" =~ ^\  ]]; then
+    if  [[ "$command" =~ ^[[:space:]]*$ ]]; then
+	return
+    elif  [[ "$command" =~ ^\  ]]; then
 	# Hidden command (e.g. to set COMMENT or COMMAND): don't log it, just silently
 	# execute it.
 	eval "$command"

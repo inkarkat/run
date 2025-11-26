@@ -116,7 +116,9 @@ exec 3<&0
 while IFS=$'\n' <&3 read -r command || [ -n "$command" ]
 do
     isSkipCounting=
-    if  [[ "$command" =~ ^\  ]]; then
+    if  [[ "$command" =~ ^[[:space:]]*$ ]]; then
+	return
+    elif  [[ "$command" =~ ^\  ]]; then
 	# Hidden command (e.g. to set COMMENT): don't count it, just execute it.
 	isSkipCounting=t
     fi

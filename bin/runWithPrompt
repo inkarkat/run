@@ -6,14 +6,14 @@ addAliasSupport()
     printf 'addAliasSupport %q %q %q %q %q\n' \
 	"$1" \
 	"${2}" \
-	"${3}${3:+|}with-header|with-prompt|trailing-prompt|no-trailing-prompt|no-output-no-prompt|no-output-no-error|emulate-prompt|no-success-no-count|exit-on-success|exit-on-failure|worst-status" \
+	"${3}${3:+|}with-header|with-prompt|trailing-prompt|no-trailing-prompt|no-output-no-prompt|no-output-no-error|emulate-prompt|no-success-no-count|exit-on-success|exit-on-failure|worst-status|status-99-is-noop" \
 	"${4}" \
 	"${5}${5:+|}initial-status|no-count-on|exit-on|exit-unless|comment|summarize-failed|summarize-failed-separator|between-command|usage-redirect"
 }
 
 getShortUsage()
 {
-    printf %s '[--initial-status NUM] [--trailing-prompt|--no-trailing-prompt] [--no-output-no-prompt] [--no-output-no-error] [--no-success-no-count|--no-count-on N] [--exit-on-success|--exit-on-failure|--exit-on NUM|--exit-unless NUM] [--emulate-prompt] [--worst-status] [-C|--comment COMMENT] [--summarize-failed ERROR-TEXT [--summarize-failed-separator SEP]]'
+    printf %s '[--initial-status NUM] [--trailing-prompt|--no-trailing-prompt] [--no-output-no-prompt] [--no-output-no-error] [--no-success-no-count|--no-count-on N] [--exit-on-success|--exit-on-failure|--exit-on NUM|--exit-unless NUM] [--emulate-prompt] [--worst-status [--status-99-is-noop]] [-C|--comment COMMENT] [--summarize-failed ERROR-TEXT [--summarize-failed-separator SEP]]'
 }
 printShortUsage()
 {
@@ -91,6 +91,8 @@ getLongUsage()
 			the rendering of PS1.
     --worst-status	Return the highest exit status of all COMMANDS instead
 			of the exit status of the last COMMAND.
+    --status-99-is-noop An exit status of 99 from COMMAND signifies no action or
+			inapplicability, and is treated like success.
     --comment|-C COMMENT
 			Use / replace \! in PS1 with COMMENT instead of the
 			default counter of executed COMMANDS.
@@ -127,6 +129,7 @@ noCountOn=
 exitOn=
 exitComparison=-eq
 isWorstStatus=
+additionalSuccessStatus=
 isSummarizeFailed=
 summarizeFailedSeparator=' '
 summarizeFailedPrefix=
@@ -151,6 +154,7 @@ do
 	--exit-unless)		shift; exitOn="$1"; shift; exitComparison=-ne;;
 	--emulate-prompt)	shift; isEmulatePrompt=t;;
 	--worst-status)		shift; isWorstStatus=t;;
+	--status-99-is-noop)	shift; additionalSuccessStatus=99;;
 	--comment|-C)		shift; COMMENT="$1"; shift;;
 	--summarize-failed)	shift; isSummarizeFailed=t; summarizeFailedPrefix="$1"; shift;;
 	--summarize-failed-separator)	shift; summarizeFailedSeparator="$1"; shift;;
@@ -296,14 +300,15 @@ commandWithPrompt()
 	local commandExitStatus=$?
 	exitStatus=$commandExitStatus
     fi
-    [ "$isSkipCounting" ] || [ -n "$isNoSuccessNoCount" -a $commandExitStatus -ne 0 ] || [ "$noCountOn" = "$commandExitStatus" ] \
+    [ "$isSkipCounting" ] || [ -n "$isNoSuccessNoCount" -a $commandExitStatus -ne 0 -a $commandExitStatus -ne ${additionalSuccessStatus:-0} ] || [ ${noCountOn:--1} -eq $commandExitStatus ] \
 	|| let count+=1
-    [ $exitStatus -eq 0 -o -z "$isSummarizeFailed" ] \
+    [ $exitStatus -eq 0 -o $exitStatus -eq ${additionalSuccessStatus:-0} -o -z "$isSummarizeFailed" ] \
 	|| summarizeFailures+="${summarizeFailures:+$summarizeFailedSeparator}${COMMENT-$count}"
-    if [ ! "$isWorstStatus" -o $exitStatus -gt $overallExitStatus ]; then
+    if [ ! "$isWorstStatus" ] || [ $exitStatus -gt ${overallExitStatus:--1} -a $exitStatus -ne ${additionalSuccessStatus:--1} ]; then
 	overallExitStatus=$exitStatus
     fi
 
+    [ $commandExitStatus -eq ${additionalSuccessStatus:--1} ] && commandExitStatus=0	# Treat 99 as success for the --exit-on comparison.
     if [ "$exitOn" ] && [ $commandExitStatus $exitComparison $exitOn ]; then
 	return 1
     fi
@@ -334,7 +339,7 @@ commandsFromArgs()
 }
 
 count=
-overallExitStatus=0
+overallExitStatus=
 summarizeFailures=
 
 [ ${#commands[@]} -eq 0 ] \
@@ -350,4 +355,4 @@ else
     [ "$summarizeFailures" ] && printf >&5 '%s%s\n' "$summarizeFailedPrefix" "$summarizeFailures"
 fi
 
-exit $overallExitStatus
+exit ${overallExitStatus:-${additionalSuccessStatus:-0}}

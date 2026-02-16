@@ -27,11 +27,12 @@ HELPDESCRIPTION
     echo
     cat <<HELPTEXT
     --emulate-prompt	runWithPrompt arguments that are ignored here.
-    --initial-status NUM
-    --trailing-prompt
-    --no-trailing-prompt
-    --no-output-no-prompt
-    --no-output-no-error
+    --initial-status NUM		- " -
+    --trailing-prompt			- " -
+    --no-trailing-prompt		- " -
+    --no-output-no-prompt		- " -
+    --no-output-no-error		- " -
+			Supported runWithPrompt arguments:
     --no-success-no-count
 			If a COMMAND fails, do not increase the count.
     --no-count-on N	If the exit status of COMMAND is N, do not increase the

@@ -126,7 +126,7 @@ do
     if  [[ "$command" =~ ^[[:space:]]*$ ]]; then
 	return
     elif  [[ "$command" =~ ^\  ]]; then
-	# Hidden command (e.g. to set COMMENT): don't count it, just execute it.
+	# Hidden command (e.g. to set COMMENT): Don't count it, ignore success, just execute it.
 	isSkipCounting=t
     fi
 
@@ -136,7 +136,12 @@ do
 	|| let count+=1
     [ $exitStatus -eq 0 -o -z "$isSummarizeFailed" ] \
 	|| summarizeFailures+="${summarizeFailures:+$summarizeFailedSeparator}${COMMENT-$count}"
-    if [ ! "$isWorstStatus" ] || [ $exitStatus -gt ${overallExitStatus:--1} -a $exitStatus -ne ${additionalSuccessStatus:--1} ]; then
+    if [ ! "$isSkipCounting" -o $exitStatus -ne 0 ] \
+	&& {
+	    [ ! "$isWorstStatus" ] \
+		|| [ $exitStatus -gt ${overallExitStatus:--1} -a $exitStatus -ne ${additionalSuccessStatus:--1} ]
+	}
+    then
 	overallExitStatus=$exitStatus
     fi
 

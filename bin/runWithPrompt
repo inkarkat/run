@@ -41,7 +41,8 @@ HISTCONTROL=ignorespace); then, it's executed silently, without printing (or
 counting) that command-line). Error handling still applies; add " || :" to
 ignore any failures of silent commands, and preferably execute them before the
 actual command, or save and restore \$exitStatus around them to keep the actual
-command's exit status.
+command's exit status. Succeeding silent commands do not disturb the noop exit
+status of 99 in case of no COMMAND(s), though.
 You can modify the logged COMMAND (basically defining a shorter or nicer alias
 for what is actually executed) by setting the COMMAND variable. If you do this
 on a separate line with the form <space>COMMAND=..., the update will happen
@@ -255,8 +256,7 @@ commandWithPrompt()
     if  [[ "$command" =~ ^[[:space:]]*$ ]]; then
 	return
     elif  [[ "$command" =~ ^\  ]]; then
-	# Hidden command (e.g. to set COMMENT or COMMAND): don't log it, just silently
-	# execute it.
+	# Hidden command (e.g. to set COMMENT): Don't count it, ignore success, just execute it.
 	eval "$command"
 	local commandExitStatus=$?
 	exitStatus=$commandExitStatus
@@ -306,7 +306,12 @@ commandWithPrompt()
 	|| let count+=1
     [ $exitStatus -eq 0 -o $exitStatus -eq ${additionalSuccessStatus:-0} -o -z "$isSummarizeFailed" ] \
 	|| summarizeFailures+="${summarizeFailures:+$summarizeFailedSeparator}${COMMENT-$count}"
-    if [ ! "$isWorstStatus" ] || [ $exitStatus -gt ${overallExitStatus:--1} -a $exitStatus -ne ${additionalSuccessStatus:--1} ]; then
+    if [ ! "$isSkipCounting" -o $exitStatus -ne 0 ] \
+	&& {
+	    [ ! "$isWorstStatus" ] \
+		|| [ $exitStatus -gt ${overallExitStatus:--1} -a $exitStatus -ne ${additionalSuccessStatus:--1} ]
+	}
+    then
 	overallExitStatus=$exitStatus
     fi
 

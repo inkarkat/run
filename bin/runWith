@@ -44,7 +44,9 @@ HELPDESCRIPTION
     --worst-status	Return the highest exit status of all COMMANDS instead
 			of the exit status of the last COMMAND.
     --status-99-is-noop An exit status of 99 from COMMAND signifies no action or
-			inapplicability, and is treated like success.
+			inapplicability, and is treated like success. If no
+			COMMAND(s) are executed, this command will then exit
+			with 99 as well.
     --comment|-c COMMENT
 			Use COMMENT instead of the default counter of executed
 			COMMANDS.

@@ -222,6 +222,10 @@ if [ "$isEmulatePrompt" ]; then
 	printf >&5 "%s%-$((${COLUMNS:-80} - ${#timestamp} - 10))s %s %s %s${promptSigil}%s\\n" "$exitColor" "$exitStatusIndicator" "$timestamp" "${comment:+!}${comment:-  }" "$COLOR_RESET" "$command"
     }
 else
+    setStatus()
+    {
+	return $exitStatus
+    }
     prompt()
     {
 	local comment="${1?}"; shift
@@ -233,8 +237,7 @@ else
 
 	local promptString="${PS1//\\!/${comment:- }}"
 	[ "$isFinal" ] && promptString="${promptString%\\n\$ }"
-	[ $exitStatus -eq 0 ] || (exit $exitStatus)
-	printf >&5 '%s%s\n' "${promptString@P}" "$command"
+	setStatus; printf >&5 '%s%s\n' "${promptString@P}" "$command"
     }
 fi
 

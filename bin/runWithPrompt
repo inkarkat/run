@@ -138,6 +138,10 @@ isSummarizeFailed=
 summarizeFailedSeparator=' '
 summarizeFailedPrefix=
 typeset -a commands=()
+option() { :; }
+parameter() { :; }
+endOfOptionsAndParameters() { :; }
+noUnderstand() { :; }
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -145,6 +149,12 @@ do
 	--addAliasSupport)	shift; addAliasSupport "$@"; exit 0;;
 	--get-short-usage)	shift; getShortUsage; exit 0;;
 	--get-long-usage)	shift; getLongUsage; exit 0;;
+	--understands)		shift
+				option() { printf 1; exit 0; }
+				parameter() { printf 2; exit 0; }
+				endOfOptionsAndParameters() { exit 99; }
+				noUnderstand() { exit 1; }
+				;;
 	--prompt)		shift; isJustShowPrompt=t
 				if [ $# -lt 1 -o $# -gt 3 ]; then
 				    printf >&2 'Usage: %q %s\n' "$(basename "$0")" '[-C|--comment COMMENT] --prompt EXIT-STATUS [COMMAND [IS-FINAL]]'
@@ -155,27 +165,27 @@ do
 				isFinal="$1"; shift
 				;;
 
-	--initial-status)	shift; exitStatus="$1"; shift;;
-	--trailing-prompt)	shift; isTrailingPrompt=t;;
-	--no-trailing-prompt)	shift; isTrailingPrompt=;;
-	--no-output-no-prompt)	shift; isNoOutputNoPrompt=t; outputRedir='2>&1';;
-	--no-output-no-error)	shift; isNoOutputNoError=t; outputRedir='2>&1';;
-	--no-success-no-count)	shift; isNoSuccessNoCount=t;;
-	--no-count-on)		shift; noCountOn="$1"; shift;;
-	--exit-on-success)	shift; exitOn=0; exitComparison=-eq;;
-	--exit-on-failure)	shift; exitOn=0; exitComparison=-ne;;
-	--exit-on)		shift; exitOn="$1"; shift; exitComparison=-eq;;
-	--exit-unless)		shift; exitOn="$1"; shift; exitComparison=-ne;;
-	--emulate-prompt)	shift; isEmulatePrompt=t;;
-	--worst-status)		shift; isWorstStatus=t;;
-	--status-99-is-noop)	shift; additionalSuccessStatus=99;;
-	--comment|-C)		shift; COMMENT="$1"; shift;;
-	--summarize-failed)	shift; isSummarizeFailed=t; summarizeFailedPrefix="$1"; shift;;
-	--summarize-failed-separator)	shift; summarizeFailedSeparator="$1"; shift;;
+	--initial-status)	shift; exitStatus="$1"; shift; option;;
+	--trailing-prompt)	shift; isTrailingPrompt=t; option;;
+	--no-trailing-prompt)	shift; isTrailingPrompt=; option;;
+	--no-output-no-prompt)	shift; isNoOutputNoPrompt=t; outputRedir='2>&1'; option;;
+	--no-output-no-error)	shift; isNoOutputNoError=t; outputRedir='2>&1'; option;;
+	--no-success-no-count)	shift; isNoSuccessNoCount=t; option;;
+	--no-count-on)		shift; noCountOn="$1"; shift; parameter;;
+	--exit-on-success)	shift; exitOn=0; exitComparison=-eq; option;;
+	--exit-on-failure)	shift; exitOn=0; exitComparison=-ne; option;;
+	--exit-on)		shift; exitOn="$1"; shift; exitComparison=-eq; parameter;;
+	--exit-unless)		shift; exitOn="$1"; shift; exitComparison=-ne; parameter;;
+	--emulate-prompt)	shift; isEmulatePrompt=t; option;;
+	--worst-status)		shift; isWorstStatus=t; option;;
+	--status-99-is-noop)	shift; additionalSuccessStatus=99; option;;
+	--comment|-C)		shift; COMMENT="$1"; shift; parameter;;
+	--summarize-failed)	shift; isSummarizeFailed=t; summarizeFailedPrefix="$1"; shift; parameter;;
+	--summarize-failed-separator)	shift; summarizeFailedSeparator="$1"; shift; parameter;;
 	--command|-c)	shift; commands+=("${1?}"); shift;;
-	--)		shift; break;;
-	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
-	*)		break;;
+	--)		endOfOptionsAndParameters; shift; break;;
+	-*)		noUnderstand; { echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		endOfOptionsAndParameters; break;;
     esac
 done
 

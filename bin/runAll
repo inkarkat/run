@@ -45,6 +45,7 @@ HELPTEXT
 }
 
 with=
+additionalSuccessStatus=
 typeset -a commands=()
 typeset -a runWithPromptArgs=()
 while [ $# -ne 0 ]
@@ -55,11 +56,12 @@ do
 	--with-header)	shift; with=header;;
 	--with-prompt)	shift; with=runWithPrompt;;
 
-	--trailing-prompt|--no-trailing-prompt|--no-output-no-prompt|--no-output-no-error|--no-success-no-count|--exit-on-success|--exit-on-failure|--emulate-prompt|--worst-status|--status-99-is-noop)
+	--trailing-prompt|--no-trailing-prompt|--no-output-no-prompt|--no-output-no-error|--no-success-no-count|--exit-on-success|--exit-on-failure|--emulate-prompt|--worst-status)
 			runWithPromptArgs+=("$1"); shift; : ${with:=runWith};;
 	--initial-status|--no-count-on|--exit-on|--exit-unless|--comment|--summarize-failed|--summarize-failed-separator)
 			runWithPromptArgs+=("$1" "$2"); shift; shift; : ${with:=runWith};;
-
+	--status-99-is-noop)
+			runWithPromptArgs+=("$1"); shift; additionalSuccessStatus=99;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		typeset -a cmd=()
@@ -106,7 +108,7 @@ case "$with" in
     header)
 	isHeader=t;&
     '')
-	status=0
+	status=
 	for c in "${commands[@]}"
 	do
 	    [ ! "$isHeader" ] || header ${isFirst:+--first} "$c"
@@ -114,10 +116,13 @@ case "$with" in
 	    printf -v quotedArgs '%q ' "$@"; quotedArgs="${quotedArgs% }"
 	    interpolatedCommand="${c//"$argMarker"/$quotedArgs}"
 	    [ "$interpolatedCommand" = "$c" ] || quotedArgs=''
-	    eval "$interpolatedCommand" "$quotedArgs" || { exitStatus=$?; if [ $exitStatus -gt $status ]; then status=$exitStatus; fi; }
+	    eval "$interpolatedCommand" "$quotedArgs"; exitStatus=$?
+	    if [ $exitStatus -gt ${status:--1} -a $exitStatus -ne ${additionalSuccessStatus:--1} ]; then
+		status=$exitStatus
+	    fi
 	    isFirst=
 	done
-	exit $status
+	exit ${status:-${additionalSuccessStatus:-0}}
 	;;
     *)	printf >&2 'ASSERT: Invalid strategy: %s\n' "$with"; exit 3;;
 esac

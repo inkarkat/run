@@ -173,7 +173,7 @@ checkin()
 }
 getLastRun()
 {
-    transactionMarker --query "$escapedId" --get-time '' --get-diff '(%R)' | joinBy - ' '
+    EXECUTIONMARKER_OUTPUT_SEPARATOR=' ' transactionMarker --query "$escapedId" --get-time '' --get-diff --output precise --prefix '(' --suffix ')' --long-units
 }
 
 tryExecute()

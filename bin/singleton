@@ -19,7 +19,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-q|--quiet|-v|--verbose] [-b|--block [-t|--timeout T[SUFFIX]]] [-i|--id ID] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-q|--quiet|-v|--verbose] [-b|--block [-t|--timeout TIMESPAN]] [-i|--id ID] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [-?|-h|--help]'
     echo
     printf 'Usage: %q %s\n' "$(basename "$1")" '[-q|--quiet|-v|--verbose] --kill -i|--id ID|-c|--command "COMMANDLINE" [-c ...]|[--] SIMPLECOMMAND'
     echo
@@ -43,6 +43,7 @@ HELPDESCRIPTION
     echo
     printShortUsage "$1"
     echo
+    local timespanFormat="$(durationToSeconds --get-short-usage format 2>/dev/null)"
     cat <<HELPTEXT
     --kill	    Kill a currently running singleton with ID / running
 		    COMMAND.
@@ -58,8 +59,8 @@ HELPDESCRIPTION
 		    executions.
     --block|-b	    Waits until the currently running instance is ended, and
 		    then runs COMMAND.
-    --timeout|-t T[SUFFIX]
-		    Only wait until timeout of T seconds (default: forever) is
+    --timeout|-t ${timespanFormat:-TIMESPAN}
+		    Only wait until timeout of TIMESPAN (default: forever) is
 		    reached.
     --command|-c "COMMANDLINE"
 		    Execute COMMANDLINE(s).
@@ -103,14 +104,7 @@ do
 	--block|-b)	shift; isBlock=t;;
 	--timeout|-t)	shift
 			timeoutMessage="; waiting for $1"
-			case "$1" in
-			    +([0-9])?(s))   timeout="${1%s}"; timeoutMessage="; waiting for ${1%s}s";;
-			    +([0-9])m)	    timeout=$((${1%m} * 60));;
-			    +([0-9])h)	    timeout=$((${1%h} * 3600));;
-			    +([0-9])d)	    timeout=$((${1%d} * 86400));;
-			    *)		    printf >&2 'ERROR: Illegal timeout: %s\n' "$1"; exit 2;;
-			esac
-			shift
+			timeout=$(durationToSeconds -- "${1:?}") || { printf >&2 'ERROR: Illegal TIMESPAN: %s\n' "$1"; exit 2; }; shift
 			;;
 	--id|-i)	shift; id="${1:?}"; shift;;
 	--)		shift; break;;

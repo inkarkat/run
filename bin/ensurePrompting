@@ -18,17 +18,7 @@ fi
 : ${ENSUREPROMPTING_LONGRUNNER_THRESHOLD=10} # Number of total COMMAND / ID runs before evaluating whether it's an interactive program (when $ENSUREPROMPTING_LONGRUNNER_PERCENTAGE is met or exceeded) that doesn't require prompting as the user will quit it on its own; use -1 to disable.
 : ${ENSUREPROMPTING_COMMAND_JOINER=;}
 
-case "$ENSUREPROMPTING_LONGRUNNER_DURATION" in
-    +([0-9])?(s))   longRunnerDurationInSeconds="${ENSUREPROMPTING_LONGRUNNER_DURATION%s}";;
-    +([0-9])m)	    longRunnerDurationInSeconds=$((${ENSUREPROMPTING_LONGRUNNER_DURATION%m} * 60));;
-    +([0-9])h)	    longRunnerDurationInSeconds=$((${ENSUREPROMPTING_LONGRUNNER_DURATION%h} * 3600));;
-    +([0-9])d)	    longRunnerDurationInSeconds=$((${ENSUREPROMPTING_LONGRUNNER_DURATION%d} * 86400));;
-    +([0-9])w)	    longRunnerDurationInSeconds=$((${ENSUREPROMPTING_LONGRUNNER_DURATION%w} * 86400 * 7));;
-    +([0-9])mo)	    longRunnerDurationInSeconds=$((${ENSUREPROMPTING_LONGRUNNER_DURATION%mo} * 86400 * 30));;
-    +([0-9])y)	    longRunnerDurationInSeconds=$((${ENSUREPROMPTING_LONGRUNNER_DURATION%y} * 86400 * 365));;
-    +([0-9])g)	    longRunnerDurationInSeconds=$((${ENSUREPROMPTING_LONGRUNNER_DURATION%g} * 86400 * 9131));;
-    *)		    printf >&2 "ERROR: Illegal duration: %s\\n" "$ENSUREPROMPTING_LONGRUNNER_DURATION"; exit 2;;
-esac
+longRunnerDurationInSeconds=$(durationToSeconds -- "$ENSUREPROMPTING_LONGRUNNER_DURATION") || { printf >&2 'ERROR: Illegal DURATION: %s\n' "$1"; exit 2; }
 
 printShortUsage()
 {

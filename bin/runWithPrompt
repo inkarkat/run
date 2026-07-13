@@ -2,7 +2,7 @@
 
 addAliasSupport()
 {
-    # Usage eval "$(runWithPrompt COMMAND '' '' '' '')"
+    # Usage eval "$(runWithPrompt --addAliasSupport COMMAND '' '' '' '')"
     printf 'addAliasSupport %q %q %q %q %q\n' \
 	"$1" \
 	"${2}" \

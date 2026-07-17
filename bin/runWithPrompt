@@ -1,4 +1,5 @@
 #!/bin/bash
+shopt -qs extglob
 
 addAliasSupport()
 {
@@ -209,7 +210,7 @@ fi
 
 case "$RUNWITHPROMPT_SINK" in
     '')		exec 5>&1;;
-    \&[0-9])	eval "exec 5>$RUNWITHPROMPT_SINK";;
+    \&+([0-9]))	eval "exec 5>$RUNWITHPROMPT_SINK";;
     ?*)		exec 5>>"$RUNWITHPROMPT_SINK";;
 esac
 

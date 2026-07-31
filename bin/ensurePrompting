@@ -170,7 +170,7 @@ isPagerPreviouslyUsedConsistentlyOrConfirmedLongRunner()
 	&& isCount "$PAGER_USE_COUNT" \
 	&& [ $PAGER_USE_COUNT -ge $ENSUREPROMPTING_PAGERWATCHER_THRESHOLD ]
     then
-	case ",${DEBUG:-}," in *,ensurePrompting,*) echo >&2 "${PS4}ensurePrompting: according to our records, the command $id always uses a pager";; esac
+	${DEBUG:+debuglog "according to our records, the command $id always uses a pager"}
 	return 0
     fi
 
@@ -180,7 +180,7 @@ isPagerPreviouslyUsedConsistentlyOrConfirmedLongRunner()
 	&& local percentage=$((100 * ${LONGRUNNER_COUNT:-0} / total)) \
 	&& ((percentage >= ENSUREPROMPTING_LONGRUNNER_PERCENTAGE))
     then
-	case ",${DEBUG:-}," in *,ensurePrompting,*) echo >&2 "${PS4}ensurePrompting: according to our records, the command $id is ${percentage}% long-running";; esac
+	${DEBUG:+debuglog "according to our records, the command $id is ${percentage}% long-running"}
 	return 0
     fi
 
@@ -199,7 +199,7 @@ pagerWatcher()
     while :
     do
 	if pgrep --pgroup ${PGID:?} --exact "${PAGER}${PAGER:+|}less" --count >/dev/null; then
-	    case ",${DEBUG:-}," in *,ensurePrompting,*) echo >&2 "${PS4}ensurePrompting: pager detected";; esac
+	    ${DEBUG:+debuglog 'pager detected'}
 	    kill -SIGUSR1 $$
 	    break
 	fi

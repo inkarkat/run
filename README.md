@@ -8,6 +8,7 @@ _Commands to run other shell command[-line]s in special ways._
 * [inkarkat/executionMarker](https://github.com/inkarkat/executionMarker) for the `singleton` command
 * [inkarkat/headers](https://github.com/inkarkat/headers) for the `runAll` and `runWithPrompt` commands
 * [inkarkat/miniDB](https://github.com/inkarkat/miniDB) for the `ensurePrompting` command
+* [inkarkat/shell-debugging](https://github.com/inkarkat/shell-debugging) for debugging (optional)
 
 ### Installation
 

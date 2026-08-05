@@ -1,1 +1,1 @@
-IFS='|' optionmunge export COMMANDNAME_WRAPPERS runAll singleton
+optionmunge -s '|' export COMMANDNAME_WRAPPERS runAll singleton

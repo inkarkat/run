@@ -166,7 +166,7 @@ do
 				isFinal="$1"; shift
 				;;
 
-	--initial-status)	shift; exitStatus="$1"; shift; option;;
+	--initial-status)	shift; exitStatus="$1"; shift; parameter;;
 	--trailing-prompt)	shift; isTrailingPrompt=t; option;;
 	--no-trailing-prompt)	shift; isTrailingPrompt=; option;;
 	--no-output-no-prompt)	shift; isNoOutputNoPrompt=t; outputRedir='2>&1'; option;;
@@ -183,7 +183,7 @@ do
 	--comment|-C)		shift; COMMENT="$1"; shift; parameter;;
 	--summarize-failed)	shift; isSummarizeFailed=t; summarizeFailedPrefix="$1"; shift; parameter;;
 	--summarize-failed-separator)	shift; summarizeFailedSeparator="$1"; shift; parameter;;
-	--command|-c)	shift; commands+=("${1?}"); shift;;
+	--command|-c)	shift; commands+=("${1?}"); shift; noUnderstand;;
 	--)		endOfOptionsAndParameters; shift; break;;
 	-*)		noUnderstand; { echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		endOfOptionsAndParameters; break;;

@@ -2,7 +2,7 @@
 
 printShortUsage()
 {
-    printf 'Usage: echo COMMANDLINES | %q %s\n' "$(basename "$1")" '[--initial-status NUM] [--trailing-prompt|--no-trailing-prompt] [--no-output-no-prompt] [--no-output-no-error] [--no-success-no-count|--no-count-on N] [--exit-on-success|--exit-on-failure|--exit-on NUM] [--emulate-prompt] [--worst-status [--status-99-is-noop]] [-c|--comment COMMENT] [--summarize-failed ERROR-TEXT [--summarize-failed-separator SEP]] [-?|-h|--help]'
+    printf 'Usage: echo COMMANDLINES | %q %s\n' "$(basename "$1")" '[--initial-status NUM] [--trailing-prompt|--no-trailing-prompt] [--no-output-no-prompt] [--no-output-no-error] [--no-success-no-count|--no-count-on N] [--exit-on-success|--exit-on-failure|--exit-on NUM] [--emulate-prompt] [--worst-status|--single-success [--status-99-is-noop]] [-c|--comment COMMENT] [--summarize-failed ERROR-TEXT [--summarize-failed-separator SEP]] [-?|-h|--help]'
     echo
     printf 'Usage: %q %s <<EOF\n  COMMANDS\nEOF\n' "$(basename "$1")" '[...]'
 }
@@ -43,6 +43,7 @@ HELPDESCRIPTION
     --exit-unless NUM	Stop execution if COMMAND does not exit with NUM.
     --worst-status	Return the highest exit status of all COMMANDS instead
 			of the exit status of the last COMMAND.
+    --single-success	Exit status is 0 if COMMAND succeeded at least once.
     --status-99-is-noop An exit status of 99 from COMMAND signifies no action or
 			inapplicability, and is treated like success. If no
 			COMMAND(s) are executed, this command will then exit
@@ -75,6 +76,7 @@ noCountOn=
 exitOn=
 exitComparison=-eq
 isWorstStatus=
+isSingleSuccess=
 additionalSuccessStatus=
 isSummarizeFailed=
 summarizeFailedSeparator=' '
@@ -96,6 +98,7 @@ do
 	--exit-unless)		shift; exitOn="$1"; shift; exitComparison=-ne;;
 	--emulate-prompt)	shift;;
 	--worst-status)		shift; isWorstStatus=t;;
+	--single-success)	shift; isSingleSuccess=t;;
 	--status-99-is-noop)	shift; additionalSuccessStatus=99;;
 	--comment|-c)		shift; COMMENT="$1"; shift;;
 	--summarize-failed)	shift; isSummarizeFailed=t; summarizeFailedPrefix="$1"; shift;;
@@ -105,10 +108,15 @@ do
 	*)		break;;
     esac
 done
+if [ "$isSingleSuccess" ] && [ "$isWorstStatus" ]; then
+    echo 'ERROR: Cannot combine --worst-status and --single-success.'; echo; printUsage "$0" >&2
+    exit 2
+fi
 [ $# -gt 0 ] && { printUsage "$0" >&2; exit 2; }
 
 count=
 overallExitStatus=
+singleSuccessStatus=
 summarizeFailures=
 
 # Prevent that read command(s) consume following commands by reading from stdin.
@@ -136,7 +144,9 @@ do
 	|| let count+=1
     [ $exitStatus -eq 0 -o -z "$isSummarizeFailed" ] \
 	|| summarizeFailures+="${summarizeFailures:+$summarizeFailedSeparator}${COMMENT-$count}"
-    if [ ! "$isSkipCounting" -o $exitStatus -ne 0 ] \
+    if [ ! "$isSkipCounting" ] && [ $exitStatus -eq 0 ] && [ "$isSingleSuccess" ]; then
+	singleSuccessStatus=0
+    elif [ ! "$isSkipCounting" -o $exitStatus -ne 0 ] \
 	&& {
 	    [ ! "$isWorstStatus" ] \
 		|| [ $exitStatus -gt ${overallExitStatus:--1} -a $exitStatus -ne ${additionalSuccessStatus:--1} ]
@@ -152,4 +162,4 @@ do
 done
 [ "$summarizeFailures" ] && printf >&2 '%s%s\n' "$summarizeFailedPrefix" "$summarizeFailures"
 
-exit ${overallExitStatus:-${additionalSuccessStatus:-0}}
+exit ${singleSuccessStatus:-${overallExitStatus:-${additionalSuccessStatus:-0}}}

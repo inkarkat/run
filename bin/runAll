@@ -45,6 +45,7 @@ HELPTEXT
 }
 
 with=
+isSingleSuccess=
 additionalSuccessStatus=
 typeset -a commands=()
 typeset -a runWithPromptArgs=()
@@ -56,6 +57,8 @@ do
 	--with-header)	shift; with=header;;
 	--with-prompt)	shift; with=runWithPrompt;;
 
+	--single-success)
+			runWithPromptArgs+=("$1"); shift; isSingleSuccess=t;;
 	--status-99-is-noop)
 			runWithPromptArgs+=("$1"); shift; additionalSuccessStatus=99;;
 	--)		shift; break;;
@@ -114,6 +117,7 @@ case "$with" in
 	isHeader=t;&
     '')
 	status=
+	singleSuccessStatus=
 	for c in "${commands[@]}"
 	do
 	    [ ! "$isHeader" ] || header ${isFirst:+--first} "$c"
@@ -122,12 +126,14 @@ case "$with" in
 	    interpolatedCommand="${c//"$argMarker"/$quotedArgs}"
 	    [ "$interpolatedCommand" = "$c" ] || quotedArgs=''
 	    eval "$interpolatedCommand" "$quotedArgs"; exitStatus=$?
-	    if [ $exitStatus -gt ${status:--1} -a $exitStatus -ne ${additionalSuccessStatus:--1} ]; then
+	    if [ $exitStatus -eq 0 ] && [ "$isSingleSuccess" ]; then
+		singleSuccessStatus=0
+	    elif [ $exitStatus -gt ${status:--1} -a $exitStatus -ne ${additionalSuccessStatus:--1} ]; then
 		status=$exitStatus
 	    fi
 	    isFirst=
 	done
-	exit ${status:-${additionalSuccessStatus:-0}}
+	exit ${singleSuccessStatus:-${status:-${additionalSuccessStatus:-0}}}
 	;;
     *)	printf >&2 'ASSERT: Invalid strategy: %s\n' "$with"; exit 3;;
 esac

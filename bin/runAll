@@ -49,6 +49,7 @@ isSingleSuccess=
 additionalSuccessStatus=
 typeset -a commands=()
 typeset -a runWithPromptArgs=()
+typeset -a commonArgs=()
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -58,9 +59,9 @@ do
 	--with-prompt)	shift; with=runWithPrompt;;
 
 	--single-success)
-			runWithPromptArgs+=("$1"); shift; isSingleSuccess=t;;
+			commonArgs+=("$1"); shift; isSingleSuccess=t;;
 	--status-99-is-noop)
-			runWithPromptArgs+=("$1"); shift; additionalSuccessStatus=99;;
+			commonArgs+=("$1"); shift; additionalSuccessStatus=99;;
 	--)		shift; break;;
 	-*)		if argCount=$(runWithPrompt --understands "$@"); then
 			    runWithPromptArgs+=("${@:1:argCount}")
@@ -111,7 +112,7 @@ case "$with" in
 		printf ' %q' "$@"
 		printf '\n'
 	    fi
-	done | ${with:?} "${runWithPromptArgs[@]}"
+	done | ${with:?} "${commonArgs[@]}" "${runWithPromptArgs[@]}"
 	;;
     header)
 	isHeader=t;&

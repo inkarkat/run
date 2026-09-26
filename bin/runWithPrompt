@@ -1,6 +1,8 @@
 #!/bin/bash
 shopt -qs extglob
 
+: ${RUNWITHPROMPT_NO_COMMAND_EXIT_STATUS:=99}
+
 addAliasSupport()
 {
     # Usage eval "$(runWithPrompt --addAliasSupport COMMAND '' '' '' '')"
@@ -120,6 +122,10 @@ getLongUsage()
 			ERROR-TEXT COMMENT1 COMMENT2 ...
     --summarize-failed-separator SEP
 			Use SEP instead of a space in between COMMENT1 COMMENT2.
+EXIT STATUS:
+    $RUNWITHPROMPT_NO_COMMAND_EXIT_STATUS	No COMMANDS passed.
+    *	Exit status from the last COMMAND / with --worst-status highest exit
+	status of all COMMAND(s).
 HELPTEXT
 }
 
@@ -372,17 +378,23 @@ commandsFromStdin()
     # to avoid consuming input.
     { exec 0</dev/tty; } 2>/dev/null || exec </dev/null
 
+    local hadCommand
     while IFS=$'\n' <&3 read -r command || [ -n "$command" ]
     do
+	hadCommand=t
 	commandWithPrompt "$command" || break
     done
+    [ "$hadCommand" ]
 }
 commandsFromArgs()
 {
+    local hadCommand
     for command in "${commands[@]}"
     do
+	hadCommand=t
 	commandWithPrompt "$command" || break
     done
+    [ "$hadCommand" ]
 }
 
 count=
@@ -390,9 +402,11 @@ overallExitStatus=
 singleSuccessStatus=
 summarizeFailures=
 
-[ ${#commands[@]} -eq 0 ] \
-    && commandsFromStdin \
-    || commandsFromArgs
+if [ ${#commands[@]} -eq 0 ]; then
+    commandsFromStdin
+else
+    commandsFromArgs
+fi || exit $RUNWITHPROMPT_NO_COMMAND_EXIT_STATUS
 
 if [ "$isTrailingPrompt" -a ${count:-0} -gt 0 ]; then
     summary=; [ "$summarizeFailures" ] && summary=$'\n'"# ${summarizeFailedPrefix}$summarizeFailures"

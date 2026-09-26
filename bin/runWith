@@ -1,5 +1,7 @@
 #!/bin/bash
 
+: ${RUNWITH_NO_COMMAND_EXIT_STATUS:=99}
+
 printShortUsage()
 {
     printf 'Usage: echo COMMANDLINES | %q %s\n' "$(basename "$1")" '[--initial-status NUM] [--trailing-prompt|--no-trailing-prompt] [--no-output-no-prompt] [--no-output-no-error] [--no-success-no-count|--no-count-on N] [--exit-on-success|--exit-on-failure|--exit-on NUM] [--emulate-prompt] [--worst-status|--single-success [--status-99-is-noop]] [-c|--comment COMMENT] [--summarize-failed ERROR-TEXT [--summarize-failed-separator SEP]] [-?|-h|--help]'
@@ -45,8 +47,8 @@ HELPDESCRIPTION
 			of the exit status of the last COMMAND.
     --single-success	Exit status is 0 if COMMAND succeeded at least once.
     --status-99-is-noop An exit status of 99 from COMMAND signifies no action or
-			inapplicability, and is treated like success. If no
-			COMMAND(s) are executed, this command will then exit
+			inapplicability, and is treated like success. If all
+			COMMAND(s) exit with 99, this command will then exit
 			with 99 as well.
     --comment|-c COMMENT
 			Use COMMENT instead of the default counter of executed
@@ -67,6 +69,10 @@ HELPDESCRIPTION
 			final line with ERROR-TEXT COMMENT1 COMMENT2 ...
     --summarize-failed-separator SEP
 			Use SEP instead of a space in between COMMENT1 COMMENT2.
+EXIT STATUS:
+    $RUNWITH_NO_COMMAND_EXIT_STATUS	No COMMANDS passed.
+    *	Exit status from the last COMMAND / with --worst-status highest exit
+	status of all COMMAND(s).
 HELPTEXT
 }
 
@@ -128,8 +134,10 @@ exec 3<&0
 # to avoid consuming input.
 { exec 0</dev/tty; } 2>/dev/null || exec </dev/null
 
+hadCommand=
 while IFS=$'\n' <&3 read -r command || [ -n "$command" ]
 do
+    hadCommand=t
     isSkipCounting=
     if  [[ "$command" =~ ^[[:space:]]*$ ]]; then
 	return
@@ -160,6 +168,7 @@ do
 	break
     fi
 done
+[ "$hadCommand" ] || exit $RUNWITH_NO_COMMAND_EXIT_STATUS
 [ "$summarizeFailures" ] && printf >&2 '%s%s\n' "$summarizeFailedPrefix" "$summarizeFailures"
 
 exit ${singleSuccessStatus:-${overallExitStatus:-${additionalSuccessStatus:-0}}}

@@ -84,10 +84,6 @@ getLongUsage()
 			ERROR-TEXT COMMENT1 COMMENT2 ...
     --summarize-failed-separator SEP
 			Use SEP instead of a space in between COMMENT1 COMMENT2.
-EXIT STATUS:
-    $RUNWITHPROMPT_NO_COMMAND_EXIT_STATUS	No COMMANDS passed.
-    *	Exit status from the last COMMAND / with --worst-status highest exit
-	status of all COMMAND(s).
 HELPTEXT
 }
 printShortUsage()
@@ -127,6 +123,12 @@ HELPDESCRIPTION
     printShortUsage "$1"
     echo
     getLongUsage
+    cat <<HELPTEXT
+EXIT STATUS:
+    $RUNWITHPROMPT_NO_COMMAND_EXIT_STATUS	No COMMANDS passed.
+    *	Exit status from the last COMMAND / with --worst-status highest exit
+	status of all COMMAND(s).
+HELPTEXT
 }
 
 isJustShowPrompt=

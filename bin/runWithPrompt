@@ -18,44 +18,6 @@ getShortUsage()
 {
     printf %s '[--initial-status NUM] [--trailing-prompt|--no-trailing-prompt] [--no-output-no-prompt] [--no-output-no-error] [--no-success-no-count|--no-count-on N] [--exit-on-success|--exit-on-failure|--exit-on NUM|--exit-unless NUM] [--emulate-prompt] [--worst-status|--single-success [--status-99-is-noop]] [-C|--comment COMMENT] [--summarize-failed ERROR-TEXT [--summarize-failed-separator SEP]]'
 }
-printShortUsage()
-{
-    printf 'Usage: echo COMMANDLINES | [RUNWITHPROMPT_SINK=FILESPEC|&N] %q %s %s\n' "$(basename "$1")" "$(getShortUsage)" '[-?|-h|--help]'
-    echo
-    printf 'Usage: %q %s <<EOF\n  COMMANDS\nEOF\n' "$(basename "$1")" '[...]'
-    echo
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[...] -c|--command COMMANDLINE [-c ...]'
-}
-printUsage()
-{
-    # This is the short help when launched with no or incorrect arguments.
-    # It is printed to stderr to avoid accidental processing.
-    printShortUsage "$1" >&2
-    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
-}
-printLongUsage()
-{
-    # This is the long "man page" when launched with the help argument.
-    # It is printed to stdout to allow paging with 'more'.
-    cat <<HELPDESCRIPTION
-Run the COMMANDS read from stdin, each surrounded by an (emulated) command
-prompt (unless the command starts with a space (like with
-HISTCONTROL=ignorespace); then, it's executed silently, without printing (or
-counting) that command-line). Error handling still applies; add " || :" to
-ignore any failures of silent commands, and preferably execute them before the
-actual command, or save and restore \$exitStatus around them to keep the actual
-command's exit status. Succeeding silent commands do not disturb the noop exit
-status of 99, though.
-You can modify the logged COMMAND (basically defining a shorter or nicer alias
-for what is actually executed) by setting the COMMAND variable. If you do this
-on a separate line with the form <space>COMMAND=..., the update will happen
-silently; i.e. without printing that command-line.
-HELPDESCRIPTION
-    echo
-    printShortUsage "$1"
-    echo
-    getLongUsage
-}
 getLongUsage()
 {
     cat <<HELPTEXT
@@ -127,6 +89,44 @@ EXIT STATUS:
     *	Exit status from the last COMMAND / with --worst-status highest exit
 	status of all COMMAND(s).
 HELPTEXT
+}
+printShortUsage()
+{
+    printf 'Usage: echo COMMANDLINES | [RUNWITHPROMPT_SINK=FILESPEC|&N] %q %s %s\n' "$(basename "$1")" "$(getShortUsage)" '[-?|-h|--help]'
+    echo
+    printf 'Usage: %q %s <<EOF\n  COMMANDS\nEOF\n' "$(basename "$1")" '[...]'
+    echo
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[...] -c|--command COMMANDLINE [-c ...]'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Run the COMMANDS read from stdin, each surrounded by an (emulated) command
+prompt (unless the command starts with a space (like with
+HISTCONTROL=ignorespace); then, it's executed silently, without printing (or
+counting) that command-line). Error handling still applies; add " || :" to
+ignore any failures of silent commands, and preferably execute them before the
+actual command, or save and restore \$exitStatus around them to keep the actual
+command's exit status. Succeeding silent commands do not disturb the noop exit
+status of 99, though.
+You can modify the logged COMMAND (basically defining a shorter or nicer alias
+for what is actually executed) by setting the COMMAND variable. If you do this
+on a separate line with the form <space>COMMAND=..., the update will happen
+silently; i.e. without printing that command-line.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    getLongUsage
 }
 
 isJustShowPrompt=

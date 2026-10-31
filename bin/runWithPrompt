@@ -11,7 +11,7 @@ addAliasSupport()
 	"${2}" \
 	"${3}${3:+|}with-header|with-prompt|trailing-prompt|no-trailing-prompt|no-output-no-prompt|no-output-no-error|emulate-prompt|no-success-no-count|exit-on-success|exit-on-failure|worst-status|status-99-is-noop" \
 	"${4}" \
-	"${5}${5:+|}initial-status|no-count-on|exit-on|exit-unless|comment|summarize-failed|summarize-failed-separator|between-command|usage-redirect"
+	"${5}${5:+|}initial-status|no-count-on|exit-on|exit-unless|comment|pre-command|post-command|summarize-failed|summarize-failed-separator|between-command|usage-redirect"
 }
 
 getShortUsage()
@@ -76,6 +76,11 @@ getLongUsage()
 			header-like context with a final summary at the end, you
 			can also set it _before_ the command, with the summary
 			last.
+    --pre-command COMMAND
+			Execute COMMAND before COMMANDS.
+    --post-command COMMAND
+			Execute COMMAND after COMMANDS (assuming execution
+			wasn't stopped).
     --summarize-failed ERROR-TEXT
 			For each failed line in COMMANDS, record the counter /
 			COMMENT and summarize those failures at the end (as a
@@ -88,7 +93,7 @@ HELPTEXT
 }
 printShortUsage()
 {
-    printf 'Usage: echo COMMANDLINES | [RUNWITHPROMPT_SINK=FILESPEC|&N] [RUNWITHPROMPT_PRE_COMMAND=COMMAND] %q %s %s\n' "$(basename "$1")" "$(getShortUsage)" '[-?|-h|--help]'
+    printf 'Usage: echo COMMANDLINES | [RUNWITHPROMPT_SINK=FILESPEC|&N] [RUNWITHPROMPT_PRE_COMMAND=COMMAND] [RUNWITHPROMPT_POST_COMMAND=COMMAND] %q %s %s\n' "$(basename "$1")" "$(getShortUsage)" '[-?|-h|--help]'
     echo
     printf 'Usage: %q %s <<EOF\n  COMMANDS\nEOF\n' "$(basename "$1")" '[...]'
     echo
@@ -149,6 +154,8 @@ isSummarizeFailed=
 summarizeFailedSeparator=' '
 summarizeFailedPrefix=
 typeset -a commands=()
+typeset -a preCommands=()
+typeset -a postCommands=()
 option() { :; }
 parameter() { :; }
 endOfOptionsAndParameters() { :; }
@@ -195,6 +202,8 @@ do
 	--summarize-failed)	shift; isSummarizeFailed=t; summarizeFailedPrefix="$1"; shift; parameter;;
 	--summarize-failed-separator)	shift; summarizeFailedSeparator="$1"; shift; parameter;;
 	--command|-c)	shift; commands+=("${1?}"); shift; noUnderstand;;
+	--pre-command)	shift; preCommands+=("${1?}"); shift; parameter;;
+	--post-command)	shift; postCommands+=("${1?}"); shift; parameter;;
 	--)		endOfOptionsAndParameters; shift; break;;
 	-*)		noUnderstand; { echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		endOfOptionsAndParameters; break;;
@@ -204,6 +213,8 @@ if [ "$isSingleSuccess" ] && [ "$isWorstStatus" ]; then
     echo 'ERROR: Cannot combine --worst-status and --single-success.'; echo; printUsage "$0" >&2
     exit 2
 fi
+[ -z "$RUNWITHPROMPT_PRE_COMMAND" ] || preCommands=("$RUNWITHPROMPT_PRE_COMMAND" "${preCommands[@]}")
+[ -z "$RUNWITHPROMPT_POST_COMMAND" ] || postCommands+=("$RUNWITHPROMPT_POST_COMMAND")
 
 if [ ! "$isEmulatePrompt" -a ! "$PS1" ]; then
     # The prompt isn't exported.
@@ -380,25 +391,32 @@ commandsFromStdin()
     # to avoid consuming input.
     { exec 0</dev/tty; } 2>/dev/null || exec </dev/null
 
-    local hadCommand
-    if [ -n "$RUNWITHPROMPT_PRE_COMMAND" ]; then
+    local hadCommand command
+    for command in "${preCommands[@]}"
+    do
 	hadCommand=t
-	commandWithPrompt "$RUNWITHPROMPT_PRE_COMMAND" || return 0
-    fi
+	commandWithPrompt "$command" || break
+    done
 
     while IFS=$'\n' <&$STDIN_FD read -r command || [ -n "$command" ]
     do
 	hadCommand=t
 	commandWithPrompt "$command" || break
     done
+
+    for command in "${postCommands[@]}"
+    do
+	hadCommand=t
+	commandWithPrompt "$command" || break
+    done
+
     exec {STDIN_FD}>&-
     [ "$hadCommand" ]
 }
 commandsFromArgs()
 {
-    typeset -a preCommand=(); [ -n "$RUNWITHPROMPT_PRE_COMMAND" ] && preCommand=("$RUNWITHPROMPT_PRE_COMMAND")
-    local hadCommand
-    for command in "${preCommand[@]}" "${commands[@]}"
+    local hadCommand command
+    for command in "${preCommands[@]}" "${commands[@]}" "${postCommands[@]}"
     do
 	hadCommand=t
 	commandWithPrompt "$command" || break

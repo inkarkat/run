@@ -4,7 +4,7 @@
 
 printShortUsage()
 {
-    printf 'Usage: echo COMMANDLINES | [RUNWITH_PRE_COMMAND=COMMAND] %q %s\n' "$(basename "$1")" '[--initial-status NUM] [--trailing-prompt|--no-trailing-prompt] [--no-output-no-prompt] [--no-output-no-error] [--no-success-no-count|--no-count-on N] [--exit-on-success|--exit-on-failure|--exit-on NUM] [--emulate-prompt] [--worst-status|--single-success [--status-99-is-noop]] [-c|--comment COMMENT] [--summarize-failed ERROR-TEXT [--summarize-failed-separator SEP]] [-?|-h|--help]'
+    printf 'Usage: echo COMMANDLINES | [RUNWITH_PRE_COMMAND=COMMAND] [RUNWITH_POST_COMMAND=COMMAND] %q %s\n' "$(basename "$1")" '[--initial-status NUM] [--trailing-prompt|--no-trailing-prompt] [--no-output-no-prompt] [--no-output-no-error] [--no-success-no-count|--no-count-on N] [--exit-on-success|--exit-on-failure|--exit-on NUM] [--emulate-prompt] [--worst-status|--single-success [--status-99-is-noop]] [-c|--comment COMMENT] [--summarize-failed ERROR-TEXT [--summarize-failed-separator SEP]] [-?|-h|--help]'
     echo
     printf 'Usage: %q %s <<EOF\n  COMMANDS\nEOF\n' "$(basename "$1")" '[...]'
     echo
@@ -65,6 +65,11 @@ HELPDESCRIPTION
 			the corresponding command, but in order to provide a
 			context for the following command, you can also set it
 			_before_.
+    --pre-command COMMAND
+			Execute COMMAND before COMMANDS.
+    --post-command COMMAND
+			Execute COMMAND after COMMANDS (assuming execution
+			wasn't stopped).
     --summarize-failed ERROR-TEXT
 			For each failed line in COMMANDS, record the counter /
 			COMMENT and summarize those failures at the end as a
@@ -90,6 +95,8 @@ isSummarizeFailed=
 summarizeFailedSeparator=' '
 summarizeFailedPrefix=
 typeset -a commands=()
+typeset -a preCommands=()
+typeset -a postCommands=()
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -113,6 +120,8 @@ do
 	--summarize-failed)	shift; isSummarizeFailed=t; summarizeFailedPrefix="$1"; shift;;
 	--summarize-failed-separator)	shift; summarizeFailedSeparator="$1"; shift;;
 	--command|-c)	shift; commands+=("${1?}"); shift;;
+	--pre-command)	shift; preCommands+=("${1?}"); shift;;
+	--post-command)	shift; postCommands+=("${1?}"); shift;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
@@ -123,6 +132,8 @@ if [ "$isSingleSuccess" ] && [ "$isWorstStatus" ]; then
     exit 2
 fi
 [ $# -gt 0 ] && { printUsage "$0" >&2; exit 2; }
+[ -z "$RUNWITHPRE_COMMAND" ] || preCommands=("$RUNWITHPRE_COMMAND" "${preCommands[@]}")
+[ -z "$RUNWITHPOST_COMMAND" ] || postCommands+=("$RUNWITHPOST_COMMAND")
 
 count=
 overallExitStatus=
@@ -175,18 +186,31 @@ commandsFromStdin()
     { exec 0</dev/tty; } 2>/dev/null || exec </dev/null
 
     local hadCommand command
+    for command in "${preCommands[@]}"
+    do
+	hadCommand=t
+	commandWithPrompt "$command" || break
+    done
+
     while IFS=$'\n' <&$STDIN_FD read -r command || [ -n "$command" ]
     do
 	hadCommand=t
 	commandWithPrompt "$command" || break
     done
+
+    for command in "${postCommands[@]}"
+    do
+	hadCommand=t
+	commandWithPrompt "$command" || break
+    done
+
     exec {STDIN_FD}>&-
     [ "$hadCommand" ]
 }
 commandsFromArgs()
 {
     local hadCommand command
-    for command in "${commands[@]}"
+    for command in "${preCommands[@]}" "${commands[@]}" "${postCommands[@]}"
     do
 	hadCommand=t
 	commandWithPrompt "$command" || break

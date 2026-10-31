@@ -11,7 +11,7 @@ addAliasSupport()
 	"${2}" \
 	"${3}${3:+|}with-header|with-prompt|trailing-prompt|no-trailing-prompt|no-output-no-prompt|no-output-no-error|emulate-prompt|no-success-no-count|exit-on-success|exit-on-failure|worst-status|status-99-is-noop" \
 	"${4}" \
-	"${5}${5:+|}initial-status|no-count-on|exit-on|exit-unless|comment|pre-command|post-command|summarize-failed|summarize-failed-separator|between-command|usage-redirect"
+	"${5}${5:+|}initial-status|no-count-on|exit-on|exit-unless|comment|pre-command|post-command|summarize-failed|summarize-failed-separator"
 }
 
 getShortUsage()

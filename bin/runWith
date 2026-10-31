@@ -4,7 +4,7 @@
 
 printShortUsage()
 {
-    printf 'Usage: echo COMMANDLINES | %q %s\n' "$(basename "$1")" '[--initial-status NUM] [--trailing-prompt|--no-trailing-prompt] [--no-output-no-prompt] [--no-output-no-error] [--no-success-no-count|--no-count-on N] [--exit-on-success|--exit-on-failure|--exit-on NUM] [--emulate-prompt] [--worst-status|--single-success [--status-99-is-noop]] [-c|--comment COMMENT] [--summarize-failed ERROR-TEXT [--summarize-failed-separator SEP]] [-?|-h|--help]'
+    printf 'Usage: echo COMMANDLINES | [RUNWITH_PRE_COMMAND=COMMAND] %q %s\n' "$(basename "$1")" '[--initial-status NUM] [--trailing-prompt|--no-trailing-prompt] [--no-output-no-prompt] [--no-output-no-error] [--no-success-no-count|--no-count-on N] [--exit-on-success|--exit-on-failure|--exit-on NUM] [--emulate-prompt] [--worst-status|--single-success [--status-99-is-noop]] [-c|--comment COMMENT] [--summarize-failed ERROR-TEXT [--summarize-failed-separator SEP]] [-?|-h|--help]'
     echo
     printf 'Usage: %q %s <<EOF\n  COMMANDS\nEOF\n' "$(basename "$1")" '[...]'
 }
@@ -169,7 +169,12 @@ exec {STDIN_FD}<&0
 { exec 0</dev/tty; } 2>/dev/null || exec </dev/null
 
 hadCommand=
-while IFS=$'\n' <&$STDIN_FD read -r command || [ -n "$command" ]
+isExitAfterPreCommand=
+if [ -n "$RUNWITH_PRE_COMMAND" ]; then
+    hadCommand=t
+    commandWithPrompt "$RUNWITH_PRE_COMMAND" || isExitAfterPreCommand=t
+fi
+[ "$isExitAfterPreCommand" ] || while IFS=$'\n' <&$STDIN_FD read -r command || [ -n "$command" ]
 do
     hadCommand=t
     commandWithPrompt "$command" || break

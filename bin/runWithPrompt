@@ -88,7 +88,7 @@ HELPTEXT
 }
 printShortUsage()
 {
-    printf 'Usage: echo COMMANDLINES | [RUNWITHPROMPT_SINK=FILESPEC|&N] %q %s %s\n' "$(basename "$1")" "$(getShortUsage)" '[-?|-h|--help]'
+    printf 'Usage: echo COMMANDLINES | [RUNWITHPROMPT_SINK=FILESPEC|&N] [RUNWITHPROMPT_PRE_COMMAND=COMMAND] %q %s %s\n' "$(basename "$1")" "$(getShortUsage)" '[-?|-h|--help]'
     echo
     printf 'Usage: %q %s <<EOF\n  COMMANDS\nEOF\n' "$(basename "$1")" '[...]'
     echo
@@ -381,6 +381,11 @@ commandsFromStdin()
     { exec 0</dev/tty; } 2>/dev/null || exec </dev/null
 
     local hadCommand
+    if [ -n "$RUNWITHPROMPT_PRE_COMMAND" ]; then
+	hadCommand=t
+	commandWithPrompt "$RUNWITHPROMPT_PRE_COMMAND" || return 0
+    fi
+
     while IFS=$'\n' <&$STDIN_FD read -r command || [ -n "$command" ]
     do
 	hadCommand=t
@@ -391,8 +396,9 @@ commandsFromStdin()
 }
 commandsFromArgs()
 {
+    typeset -a preCommand=(); [ -n "$RUNWITHPROMPT_PRE_COMMAND" ] && preCommand=("$RUNWITHPROMPT_PRE_COMMAND")
     local hadCommand
-    for command in "${commands[@]}"
+    for command in "${preCommand[@]}" "${commands[@]}"
     do
 	hadCommand=t
 	commandWithPrompt "$command" || break

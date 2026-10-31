@@ -224,9 +224,9 @@ fi
 : ${RUNWITHPROMPT_TIMESTAMP:=%d-%b-%Y %T}
 
 case "$RUNWITHPROMPT_SINK" in
-    '')		exec 5>&1;;
-    \&+([0-9]))	eval "exec 5>$RUNWITHPROMPT_SINK";;
-    ?*)		exec 5>>"$RUNWITHPROMPT_SINK";;
+    '')		exec {OUT_FD}>&1;;
+    \&+([0-9]))	eval "exec {OUT_FD}>$RUNWITHPROMPT_SINK";;
+    ?*)		exec {OUT_FD}>>"$RUNWITHPROMPT_SINK";;
 esac
 
 timestamp()
@@ -255,7 +255,7 @@ if [ "$isEmulatePrompt" ]; then
 
 	local timestamp="$(timestamp)"
 	local promptSigil='\n$ '; [ "$isFinal" ] && promptSigil=''
-	printf >&5 "%s%-$((${COLUMNS:-80} - ${#timestamp} - 10))s %s %s %s${promptSigil}%s\\n" "$exitColor" "$exitStatusIndicator" "$timestamp" "${comment:+!}${comment:-  }" "$COLOR_RESET" "$command"
+	printf >&$OUT_FD "%s%-$((${COLUMNS:-80} - ${#timestamp} - 10))s %s %s %s${promptSigil}%s\\n" "$exitColor" "$exitStatusIndicator" "$timestamp" "${comment:+!}${comment:-  }" "$COLOR_RESET" "$command"
     }
 else
     setStatus()
@@ -273,7 +273,7 @@ else
 
 	local promptString="${PS1//\\!/${comment:- }}"
 	[ "$isFinal" ] && promptString="${promptString%\\n\$ }"
-	setStatus; printf >&5 '%s%s\n' "${promptString@P}" "$command"
+	setStatus; printf >&$OUT_FD '%s%s\n' "${promptString@P}" "$command"
     }
 fi
 
@@ -375,17 +375,18 @@ commandsFromStdin()
     # stdin. Instead, redirect stdin directly from the terminal (if available),
     # or the null device. Note: For some commands, you can also directly
     # influence their behavior; e.g. ssh -n.
-    exec 3<&0
+    exec {STDIN_FD}<&0
     # Force reading directly from terminal / null device if stdin is redirected,
     # to avoid consuming input.
     { exec 0</dev/tty; } 2>/dev/null || exec </dev/null
 
     local hadCommand
-    while IFS=$'\n' <&3 read -r command || [ -n "$command" ]
+    while IFS=$'\n' <&$STDIN_FD read -r command || [ -n "$command" ]
     do
 	hadCommand=t
 	commandWithPrompt "$command" || break
     done
+    exec {STDIN_FD}>&-
     [ "$hadCommand" ]
 }
 commandsFromArgs()
@@ -416,7 +417,7 @@ if [ "$isTrailingPrompt" -a ${count:-0} -gt 0 ]; then
     adaptColumnsToFitLongComment
     prompt "${COMMENT-$count}" "$summary" t
 else
-    [ "$summarizeFailures" ] && printf >&5 '%s%s\n' "$summarizeFailedPrefix" "$summarizeFailures"
+    [ "$summarizeFailures" ] && printf >&$OUT_FD '%s%s\n' "$summarizeFailedPrefix" "$summarizeFailures"
 fi
 
 exit ${singleSuccessStatus:-${overallExitStatus:-${additionalSuccessStatus:-0}}}

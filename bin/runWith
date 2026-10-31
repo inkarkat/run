@@ -129,13 +129,13 @@ summarizeFailures=
 # Instead, redirect stdin directly from the terminal (if available), or the null
 # device. Note: For some commands, you can also directly influence their
 # behavior; e.g. ssh -n.
-exec 3<&0
+exec {STDIN_FD}<&0
 # Force reading directly from terminal / null device if stdin is redirected,
 # to avoid consuming input.
 { exec 0</dev/tty; } 2>/dev/null || exec </dev/null
 
 hadCommand=
-while IFS=$'\n' <&3 read -r command || [ -n "$command" ]
+while IFS=$'\n' <&$STDIN_FD read -r command || [ -n "$command" ]
 do
     hadCommand=t
     isSkipCounting=
@@ -168,6 +168,7 @@ do
 	break
     fi
 done
+exec {STDIN_FD}>&-
 [ "$hadCommand" ] || exit $RUNWITH_NO_COMMAND_EXIT_STATUS
 [ "$summarizeFailures" ] && printf >&2 '%s%s\n' "$summarizeFailedPrefix" "$summarizeFailures"
 

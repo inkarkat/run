@@ -125,20 +125,10 @@ overallExitStatus=
 singleSuccessStatus=
 summarizeFailures=
 
-# Prevent that read command(s) consume following commands by reading from stdin.
-# Instead, redirect stdin directly from the terminal (if available), or the null
-# device. Note: For some commands, you can also directly influence their
-# behavior; e.g. ssh -n.
-exec {STDIN_FD}<&0
-# Force reading directly from terminal / null device if stdin is redirected,
-# to avoid consuming input.
-{ exec 0</dev/tty; } 2>/dev/null || exec </dev/null
-
-hadCommand=
-while IFS=$'\n' <&$STDIN_FD read -r command || [ -n "$command" ]
-do
-    hadCommand=t
-    isSkipCounting=
+commandWithPrompt()
+{
+    local command="${1?}"; shift
+    local isSkipCounting=
     if  [[ "$command" =~ ^[[:space:]]*$ ]]; then
 	return
     elif  [[ "$command" =~ ^\  ]]; then
@@ -147,7 +137,7 @@ do
     fi
 
     eval "$command"
-    exitStatus=$?
+    local exitStatus=$?
     [ "$isSkipCounting" ] || [ -n "$isNoSuccessNoCount" -a $exitStatus -ne 0 -a $exitStatus -ne ${additionalSuccessStatus:-0} ] || [ ${noCountOn:--1} = $exitStatus ] \
 	|| let count+=1
     [ $exitStatus -eq 0 -o -z "$isSummarizeFailed" ] \
@@ -165,8 +155,24 @@ do
 
     [ $exitStatus -eq ${additionalSuccessStatus:--1} ] && exitStatus=0	# Treat 99 as success for the --exit-on comparison.
     if [ "$exitOn" ] && [ $exitStatus $exitComparison $exitOn ]; then
-	break
+	return 1
     fi
+}
+
+# Prevent that read command(s) consume following commands by reading from stdin.
+# Instead, redirect stdin directly from the terminal (if available), or the null
+# device. Note: For some commands, you can also directly influence their
+# behavior; e.g. ssh -n.
+exec {STDIN_FD}<&0
+# Force reading directly from terminal / null device if stdin is redirected,
+# to avoid consuming input.
+{ exec 0</dev/tty; } 2>/dev/null || exec </dev/null
+
+hadCommand=
+while IFS=$'\n' <&$STDIN_FD read -r command || [ -n "$command" ]
+do
+    hadCommand=t
+    commandWithPrompt "$command" || break
 done
 exec {STDIN_FD}>&-
 [ "$hadCommand" ] || exit $RUNWITH_NO_COMMAND_EXIT_STATUS
